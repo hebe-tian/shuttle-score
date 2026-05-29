@@ -1,0 +1,78 @@
+:root {
+    --primary: #52b788;
+    --primary-dark: #40916c;
+    --primary-darker: #2d6a4f;
+    --primary-darkest: #1b4332;
+    --primary-light: #74c69d;
+    --primary-lighter: #95d5b2;
+    --primary-lightest: #b7e4c7;
+    --primary-bg: #d8f3dc;
+    --page-bg: #f0f7f0;
+    --white: #ffffff;
+    --error: #e63946;
+    --warning: #f59e0b;
+    --text-primary: #1b4332;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --border: #c8e6d0;
+    --border-focus: #52b788;
+    --gender-male: #3b82f6;
+    --gender-female: #ec4899;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
+    --shadow-lg: 0 4px 12px rgba(82,183,136,0.3);
+    --radius-card: 12px;
+    --radius-pill: 24px;
+    --radius-tag: 10px;
+    --radius-input: 8px;
+    --radius-modal: 16px;
+    --font-title: 'Trebuchet MS', sans-serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-score: 'Trebuchet MS', monospace;
+    --match-ms: #3b82f6;
+    --match-ws: #ec4899;
+    --match-os: #8b5cf6;
+    --match-md: #06b6d4;
+    --match-wd: #f43f5e;
+    --match-xd: #f59e0b;
+    --match-od: #10b981;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--page-bg);
+    color: var(--text-primary);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--primary-dark);
+}
+
+input, select, textarea {
+    font-family: var(--font-body);
+    font-size: 14px;
+}
+
+@media (max-width: 767px) {
+    body {
+        padding-bottom: 70px;
+    }
+}

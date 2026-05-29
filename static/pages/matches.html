@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>录入比赛 - Shuttle Score</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    <div class="container">
+        <h2 style="font-family:var(--font-title);color:var(--primary-darker);margin-bottom:16px;">录入比赛</h2>
+
+        <div class="card">
+            <div class="step-bar">
+                <span class="step-item active">1 类型</span>
+                <span class="step-item">2 选手</span>
+                <span class="step-item">3 比分</span>
+                <span class="step-item">4 确认</span>
+            </div>
+
+            <div class="step-content" id="step-1">
+                <div class="form-label" style="margin-bottom:10px;">选择比赛类型</div>
+                <div class="type-grid">
+                    <div class="type-option" data-type="ms">男单</div>
+                    <div class="type-option" data-type="ws">女单</div>
+                    <div class="type-option" data-type="os">无限制单打</div>
+                    <div class="type-option" data-type="md">男双</div>
+                    <div class="type-option" data-type="wd">女双</div>
+                    <div class="type-option" data-type="xd">混双</div>
+                    <div class="type-option" data-type="od">无限制双打</div>
+                </div>
+            </div>
+
+            <div class="step-content" id="step-2">
+                <div id="player-select-area"></div>
+            </div>
+
+            <div class="step-content" id="step-3">
+                <div class="form-label" style="margin-bottom:10px;">输入比分</div>
+                <div id="score-input-area"></div>
+                <button type="button" id="add-game-btn" class="btn btn-outline btn-sm" style="margin-top:8px;">+ 添加一局</button>
+            </div>
+
+            <div class="step-content" id="step-4">
+                <div class="form-label" style="margin-bottom:10px;">确认比赛信息</div>
+                <div id="confirm-area"></div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:16px;">
+                <button type="button" id="step-prev" class="btn btn-outline" style="display:none;">上一步</button>
+                <button type="button" id="step-next" class="btn btn-primary">下一步</button>
+                <button type="button" id="step-submit" class="btn btn-primary" style="display:none;">确认提交</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/players.js"></script>
+    <script src="/js/matches.js"></script>
+    <script>
+        if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+
+        ShuttleNav.renderAll('matches');
+
+        ShuttleMatches.initRecord();
+    </script>
+</body>
+</html>

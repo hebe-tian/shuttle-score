@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>我的 - Shuttle Score</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    <div class="container">
+        <div id="welcome-section" class="card" style="margin-bottom:16px;">
+            <h2 style="font-family:var(--font-title);color:var(--primary-darker);margin-bottom:4px;">Welcome</h2>
+            <p style="color:var(--text-secondary);font-size:14px;" id="welcome-text"></p>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h3 style="font-family:var(--font-title);color:var(--primary-darker);">近期比赛</h3>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <a href="/pages/match-query.html" id="more-matches-link" style="font-size:13px;color:var(--primary);text-decoration:none;">更多</a>
+                <a href="/pages/matches.html" class="btn btn-primary btn-sm">录入比赛</a>
+            </div>
+        </div>
+
+        <div id="recent-matches"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:24px;">
+            <h3 style="font-family:var(--font-title);color:var(--primary-darker);">选手列表</h3>
+            <button id="open-add-player" class="btn btn-primary btn-sm">录入选手</button>
+        </div>
+
+        <div class="filter-bar">
+            <button class="filter-chip gender-chip active" data-gender="">全部</button>
+            <button class="filter-chip gender-chip" data-gender="male">男</button>
+            <button class="filter-chip gender-chip" data-gender="female">女</button>
+        </div>
+
+        <div id="player-list"></div>
+        <div id="player-expand" style="text-align:center;margin-top:8px;display:none;">
+            <button id="expand-players-btn" class="btn btn-outline btn-sm">展开更多</button>
+        </div>
+    </div>
+
+    <div id="add-player-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">录入选手</div>
+            <form id="add-player-form">
+                <div class="form-group">
+                    <label class="form-label">选手名称</label>
+                    <input type="text" id="player-name" class="form-input" placeholder="2-20位" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">性别</label>
+                    <select id="player-gender" class="form-select" required>
+                        <option value="">请选择</option>
+                        <option value="male">男</option>
+                        <option value="female">女</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="close-add-player" class="btn btn-outline btn-sm">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/players.js"></script>
+    <script src="/js/matches.js"></script>
+    <script>
+        if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+
+        ShuttleNav.renderAll('home');
+
+        const user = ShuttleAuth.getUser();
+        if (user) {
+            document.getElementById('welcome-text').textContent = user.username;
+        }
+
+        async function loadRecentMatches() {
+            const res = await ShuttleAPI.matches.query({ page: 1, page_size: 5 });
+            const container = document.getElementById('recent-matches');
+            if (res.ok && res.data && res.data.items && res.data.items.length > 0) {
+                container.innerHTML = res.data.items.map(m => ShuttleNav.renderMatchCard(m)).join('');
+            } else {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-text">还没有比赛记录</div></div>';
+            }
+        }
+
+        loadRecentMatches();
+
+        const PLAYER_PAGE_SIZE = 10;
+        let playerExpanded = false;
+
+        const origLoadPlayers = ShuttlePlayers.loadPlayers.bind(ShuttlePlayers);
+        ShuttlePlayers.loadPlayers = async function(gender) {
+            this.currentGender = gender || '';
+            const res = await ShuttleAPI.players.list(this.currentGender);
+            if (res.ok) {
+                const allPlayers = res.data || [];
+                if (!playerExpanded && allPlayers.length > PLAYER_PAGE_SIZE) {
+                    this.renderPlayerList(allPlayers.slice(0, PLAYER_PAGE_SIZE));
+                    document.getElementById('player-expand').style.display = 'block';
+                } else {
+                    this.renderPlayerList(allPlayers);
+                    document.getElementById('player-expand').style.display = allPlayers.length > PLAYER_PAGE_SIZE ? 'none' : 'none';
+                }
+            }
+            return res;
+        };
+
+        const origRenderPlayerList = ShuttlePlayers.renderPlayerList.bind(ShuttlePlayers);
+        ShuttlePlayers.renderPlayerList = function(players) {
+            const container = document.getElementById('player-list');
+            if (!container) return;
+
+            if (!players || players.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">还没有选手，快去添加吧</div></div>';
+                return;
+            }
+
+            container.innerHTML = players.map(p => `
+                <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <strong>${p.name}</strong>
+                        <span style="margin-left:8px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;color:#fff;background:${p.gender === 'male' ? 'var(--gender-male)' : 'var(--gender-female)'};">${p.gender === 'male' ? '男' : '女'}</span>
+                    </div>
+                    <span style="font-size:12px;color:var(--text-muted);">${ShuttleNav.formatDate(p.created_at)}</span>
+                </div>
+            `).join('');
+        };
+
+        document.getElementById('expand-players-btn')?.addEventListener('click', () => {
+            playerExpanded = true;
+            ShuttlePlayers.loadPlayers(ShuttlePlayers.currentGender);
+        });
+
+        ShuttlePlayers.init();
+    </script>
+</body>
+</html>

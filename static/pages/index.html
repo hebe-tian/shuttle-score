@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>Shuttle Score - 羽毛球记分</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    <div class="container">
+        <div style="display:flex;align-items:center;gap:16px;padding:40px 0 20px;justify-content:center;">
+            <img src="/images/logo.png" alt="Shuttle Score" style="height:80px;width:80px;">
+            <div>
+                <h1 style="font-family:var(--font-title);font-size:32px;color:var(--primary-darker);">Shuttle Score</h1>
+                <p style="color:var(--text-secondary);margin-top:4px;font-size:15px;">轻松记录每一场羽毛球比赛</p>
+            </div>
+        </div>
+
+        <div id="random-matches" class="match-grid" style="margin-bottom:24px;"></div>
+
+        <div id="cta-card" class="cta-card">
+            <div class="cta-title">开始记录你的比赛</div>
+            <div class="cta-desc">注册账号，添加选手，记录比分，查看统计</div>
+            <div class="cta-buttons">
+                <a href="/pages/register.html" class="cta-btn-primary">立即注册</a>
+                <a href="/pages/login.html" class="cta-btn-outline">已有账号</a>
+            </div>
+        </div>
+        <div id="cta-logged-in" class="cta-card" style="display:none;">
+            <div class="cta-title">欢迎回来</div>
+            <div class="cta-desc">查看你的比赛记录和数据统计</div>
+            <div class="cta-buttons">
+                <a href="/pages/myhomepage.html" class="cta-btn-primary">进入我的主页</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script>
+        ShuttleNav.renderNavBar('');
+
+        if (ShuttleAuth.isLoggedIn()) {
+            document.getElementById('cta-card').style.display = 'none';
+            document.getElementById('cta-logged-in').style.display = 'block';
+        }
+
+        async function loadRandomMatches() {
+            const res = await ShuttleAPI.matches.random();
+            const container = document.getElementById('random-matches');
+            if (res.ok && res.data && res.data.length > 0) {
+                container.innerHTML = res.data.map(m => {
+                    const typeLabel = ShuttleNav.getMatchTypeLabel(m.type);
+                    const scores = m.scores || [];
+                    const scoreStr = scores.map(s => `${s.team1_score}:${s.team2_score}`).join(' / ');
+                    return `
+                        <div class="match-card">
+                            <div class="match-card-header">
+                                <span class="tag tag-${m.type}">${typeLabel}</span>
+                                <span class="match-card-date">${ShuttleNav.formatTime(m.match_time)}</span>
+                            </div>
+                            <div class="match-card-score">${scoreStr || '-'}</div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = `
+                    <div class="empty-state" style="grid-column:1/-1;">
+                        <div class="empty-state-icon"></div>
+                        <div class="empty-state-text">还没有比赛记录，快来记录第一场吧</div>
+                    </div>
+                `;
+            }
+        }
+
+        loadRandomMatches();
+    </script>
+</body>
+</html>

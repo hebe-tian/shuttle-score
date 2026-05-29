@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>管理员管理 - Shuttle Score</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <div class="admin-sidebar-brand">管理后台</div>
+            <a href="/pages/admin/dashboard.html" class="admin-nav-item">仪表盘</a>
+            <a href="/pages/admin/admins.html" class="admin-nav-item active">管理员管理</a>
+            <a href="/pages/admin/users.html" class="admin-nav-item">用户管理</a>
+            <a href="/pages/admin/matches.html" class="admin-nav-item">比赛管理</a>
+            <a href="/pages/admin/players.html" class="admin-nav-item">选手管理</a>
+            <a href="/pages/admin/login.html" class="admin-nav-item" onclick="ShuttleAuth.adminLogout()" style="color:var(--error);">退出登录</a>
+        </aside>
+
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1 class="admin-title">管理员管理</h1>
+            </div>
+
+            <div class="card" style="margin-bottom:16px;">
+                <h3 style="font-size:14px;color:var(--primary-darker);margin-bottom:12px;">添加管理员</h3>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
+                        <input type="text" id="new-admin-account" class="form-input" placeholder="账号（4-20位）">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
+                        <input type="password" id="new-admin-password" class="form-input" placeholder="密码（6-20位）">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="ShuttleAdmin.createAdmin()">添加</button>
+                </div>
+            </div>
+
+            <div id="admin-list"></div>
+        </main>
+    </div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/admin.js"></script>
+    <script>
+        if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+        ShuttleAdmin.loadAdmins();
+    </script>
+</body>
+</html>

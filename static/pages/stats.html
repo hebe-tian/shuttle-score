@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>数据统计 - Shuttle Score</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .stats-section {
+            background: var(--white);
+            border-radius: var(--radius-card);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 16px;
+            cursor: default;
+        }
+        .stats-section.dragging {
+            opacity: 0.5;
+            border: 2px dashed var(--primary);
+        }
+        .stats-section.drag-over {
+            border-top: 3px solid var(--primary);
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .section-title {
+            font-family: var(--font-title);
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-darker);
+        }
+        .drag-handle {
+            cursor: grab;
+            color: var(--text-muted);
+            font-size: 16px;
+            padding: 4px 8px;
+            user-select: none;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        .sub-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .type-chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .type-chip {
+            padding: 4px 12px;
+            border-radius: var(--radius-pill);
+            font-size: 12px;
+            cursor: pointer;
+            background: var(--page-bg, #f0f7f0);
+            color: var(--text-secondary, #666);
+            border: 1px solid var(--border, #c8e6d0);
+            transition: all 0.2s;
+        }
+        .type-chip.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+            font-weight: bold;
+        }
+        .type-chip:hover:not(.active) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .sub-tab {
+            padding: 6px 14px;
+            border-radius: var(--radius-pill);
+            font-size: 12px;
+            cursor: pointer;
+            background: var(--primary-bg);
+            color: var(--primary-darker);
+            border: none;
+            transition: all 0.2s;
+        }
+        .sub-tab.active {
+            background: var(--primary);
+            color: var(--white);
+            font-weight: bold;
+        }
+        .chart-container {
+            position: relative;
+            height: 280px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    <div class="container">
+        <h2 style="font-family:var(--font-title);color:var(--primary-darker);margin-bottom:16px;">数据统计</h2>
+
+        <div class="filter-bar">
+            <div class="form-group" style="margin-bottom:0;">
+                <input type="text" id="stats-member" class="form-input" placeholder="筛选选手" style="max-width:200px;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <input type="date" id="stats-start" class="form-input" style="max-width:180px;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <input type="date" id="stats-end" class="form-input" style="max-width:180px;">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="ShuttleStats.applyFilters()">筛选</button>
+        </div>
+
+        <div id="stats-sections"></div>
+    </div>
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/stats.js"></script>
+    <script>
+        if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+        ShuttleNav.renderAll('stats');
+        ShuttleStats.init();
+    </script>
+</body>
+</html>

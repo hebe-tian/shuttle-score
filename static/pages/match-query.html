@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>比赛查询 - Shuttle Score</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    <div class="container">
+        <h2 style="font-family:var(--font-title);color:var(--primary-darker);margin-bottom:16px;">比赛查询</h2>
+
+        <div class="card">
+            <form id="query-form">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                    <div class="form-group">
+                        <label class="form-label">比赛类型</label>
+                        <select id="query-type" class="form-select">
+                            <option value="">全部</option>
+                            <option value="singles">单打</option>
+                            <option value="doubles">双打</option>
+                            <option value="ms">男单</option>
+                            <option value="ws">女单</option>
+                            <option value="os">无限制单打</option>
+                            <option value="md">男双</option>
+                            <option value="wd">女双</option>
+                            <option value="xd">混双</option>
+                            <option value="od">无限制双打</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">选手名称</label>
+                        <input type="text" id="query-member" class="form-input" placeholder="搜索选手">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">开始日期</label>
+                        <input type="date" id="query-start" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">结束日期</label>
+                        <input type="date" id="query-end" class="form-input">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">查询</button>
+            </form>
+        </div>
+
+        <div id="query-results"></div>
+        <div id="query-pagination" class="pagination"></div>
+    </div>
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/matches.js"></script>
+    <script>
+        if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+
+        ShuttleNav.renderAll('query');
+
+        ShuttleMatches.initQuery();
+    </script>
+</body>
+</html>
