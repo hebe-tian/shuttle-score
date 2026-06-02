@@ -59,8 +59,6 @@ def load_encrypted_config(app, base_dir=None):
                 v = decrypt_value(v, key)
             app.config[k] = v
 
-    if 'DATABASE_URI' in app.config:
-        app.config['SQLALCHEMY_DATABASE_URI'] = app.config.pop('DATABASE_URI')
     if 'JWT_SECRET_KEY' in app.config:
         app.config['JWT_SECRET_KEY'] = app.config['JWT_SECRET_KEY']
     if 'SUPER_ADMIN_ACCOUNT' in app.config:

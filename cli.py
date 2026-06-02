@@ -127,8 +127,6 @@ def register_cli(app):
         key = generate_key()
         base_dir = os.path.abspath(os.path.dirname(__file__))
 
-        default_db = 'sqlite:///' + os.path.join(base_dir, 'shuttle_score.db')
-        database_uri = click.prompt('DATABASE_URI', default=default_db)
         jwt_secret = click.prompt('JWT_SECRET_KEY (留空自动生成)', default='')
         if not jwt_secret:
             jwt_secret = secrets.token_hex(32)
@@ -141,7 +139,6 @@ def register_cli(app):
             click.echo(f'  自动生成: {admin_password[:8]}...')
 
         lines = []
-        lines.append(f'DATABASE_URI={encrypt_value(database_uri, key)}')
         lines.append(f'JWT_SECRET_KEY={encrypt_value(jwt_secret, key)}')
         lines.append(f'SUPER_ADMIN_ACCOUNT={encrypt_value(admin_account, key)}')
         lines.append(f'SUPER_ADMIN_PASSWORD={encrypt_value(admin_password, key)}')

@@ -55,10 +55,11 @@ flask encrypt-env
 
 | 配置项 | 说明 | 建议 |
 |--------|------|------|
-| `DATABASE_URI` | 数据库连接 | 使用默认值即可（自动使用绝对路径） |
 | `JWT_SECRET_KEY` | JWT 签名密钥 | 留空自动生成 64 位随机密钥 |
 | `SUPER_ADMIN_ACCOUNT` | 超级管理员账号 | 自定义，如 `myadmin` |
 | `SUPER_ADMIN_PASSWORD` | 超级管理员密码 | 留空自动生成 16 位随机密码 |
+
+> `DATABASE_URI` 不需要手动配置，生产环境自动使用项目目录下的 `shuttle_score.db`。
 
 执行成功后会生成两个文件：
 
