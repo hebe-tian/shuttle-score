@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, current_app
 import jwt
 import time
 from extensions import db
@@ -6,7 +6,6 @@ from models.user import User
 from utils.response import success, bad_request, conflict, unauthorized, not_found
 from utils.validators import validate_account, validate_password, validate_username
 from utils.auth_decorator import token_required
-from config import JWT_SECRET_KEY, USER_TOKEN_EXPIRE_DAYS
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -36,7 +35,7 @@ def register():
             'account': account,
             'password': password,
             'exp': int(time.time()) + 600
-        }, JWT_SECRET_KEY, algorithm='HS256')
+        }, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
 
         return success({"temp_token": temp_token, "account": account})
 
@@ -56,7 +55,7 @@ def register():
             return bad_request("缺少临时Token")
 
         try:
-            token_data = jwt.decode(temp_token, JWT_SECRET_KEY, algorithms=['HS256'])
+            token_data = jwt.decode(temp_token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
             if token_data.get('type') != 'register_temp':
                 return bad_request("无效的临时Token")
         except jwt.ExpiredSignatureError:
@@ -110,8 +109,8 @@ def login():
     token = jwt.encode({
         'type': 'user',
         'user_id': user.id,
-        'exp': int(time.time()) + USER_TOKEN_EXPIRE_DAYS * 86400
-    }, JWT_SECRET_KEY, algorithm='HS256')
+        'exp': int(time.time()) + current_app.config['USER_TOKEN_EXPIRE_DAYS'] * 86400
+    }, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
 
     return success({
         "token": token,

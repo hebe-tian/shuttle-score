@@ -11,7 +11,7 @@
 
 | 限制项 | 说明 |
 |--------|------|
-| 域名 | `your-username.eu.pythonanywhere.com` |
+| 域名 | `your-username.pythonanywhere.com` |
 | CPU 秒数 | 每天 100 秒 |
 | 磁盘空间 | 512 MB |
 | 私有文件 | 不支持（所有文件对其他用户可见） |
@@ -25,7 +25,6 @@
 登录 PythonAnywhere 后，打开一个 **Bash 控制台**（Consoles → Bash）：
 
 ```bash
-# 克隆你的 GitHub 仓库
 git clone https://github.com/your-username/shuttle-score.git ~/shuttle-score
 ```
 
@@ -35,123 +34,141 @@ git clone https://github.com/your-username/shuttle-score.git ~/shuttle-score
 
 ```bash
 cd ~/shuttle-score
-
-# 创建虚拟环境（PythonAnywhere 默认提供 Python 3.10+）
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 安装依赖
+python3 -m venv .shuttle
+source .shuttle/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. 初始化数据库
+### 3. 加密生产环境配置
+
+在**本地机器**上生成加密配置文件：
 
 ```bash
-# 确保虚拟环境已激活
-source .venv/bin/activate
+cd shuttle-score
+source .shuttle/bin/activate
 
-# 初始化数据库（创建表 + 超级管理员）
-python3 init_db.py
+# 生成加密配置（交互式输入）
+flask encrypt-env
 ```
 
-执行成功后会输出：
+按提示输入：
 
-```
-Super admin created: superadmin
-Database initialized successfully
-```
+| 配置项 | 说明 | 建议 |
+|--------|------|------|
+| `DATABASE_URI` | 数据库连接 | 使用默认值即可（自动使用绝对路径） |
+| `JWT_SECRET_KEY` | JWT 签名密钥 | 留空自动生成 64 位随机密钥 |
+| `SUPER_ADMIN_ACCOUNT` | 超级管理员账号 | 自定义，如 `myadmin` |
+| `SUPER_ADMIN_PASSWORD` | 超级管理员密码 | 留空自动生成 16 位随机密码 |
 
-### 4. 配置环境变量
+执行成功后会生成两个文件：
 
-在 Bash 控制台中创建环境变量文件：
+- `.env.prod` — 加密后的配置文件（提交到服务器）
+- `.env.prod.key` — 加密密钥（**不要提交到 Git**）
+
+### 4. 上传加密配置到 PythonAnywhere
+
+将加密配置文件和密钥上传到服务器：
+
+**方式 A：使用 SCP（推荐）**
+
+在**本地机器**上执行：
 
 ```bash
-cat > ~/shuttle-score/.env << 'EOF'
-JWT_SECRET_KEY=你的随机密钥-请替换为复杂字符串
-SUPER_ADMIN_ACCOUNT=superadmin
-SUPER_ADMIN_PASSWORD=你的安全密码
+scp .env.prod .env.prod.key your-username@your-username.pythonanywhere.com:~/shuttle-score/
+```
+
+> ⚠️ PythonAnywhere 免费账号不支持 SSH/SCP，请使用方式 B。
+
+**方式 B：在 PythonAnywhere Bash 控制台中手动创建**
+
+在 PythonAnywhere 的 Bash 控制台中：
+
+```bash
+cd ~/shuttle-score
+
+# 创建加密密钥文件（将本地 .env.prod.key 的内容粘贴进来）
+cat > .env.prod.key << 'EOF'
+粘贴你的密钥内容
 EOF
+
+# 创建加密配置文件（将本地 .env.prod 的内容粘贴进来）
+cat > .env.prod << 'EOF'
+粘贴你的加密配置内容
+EOF
+
+# 设置文件权限（仅自己可读）
+chmod 600 .env.prod.key .env.prod
 ```
 
-> ⚠️ **安全提示**：免费账号的文件对其他用户可见，请设置足够复杂的密码和密钥。可以使用 `python3 -c "import secrets; print(secrets.token_hex(32))"` 生成随机密钥。
+### 5. 初始化数据库并创建管理员
 
-### 5. 创建 WSGI 配置文件
+```bash
+cd ~/shuttle-score
+source .shuttle/bin/activate
+export FLASK_ENV=production
 
-在 PythonAnywhere 的 **Web** 页面（点击顶部菜单 "Web"）：
+# ⚠️ 首次部署无需备份；后续更新时，在执行迁移前先备份数据库
+# cp ~/shuttle-score/shuttle_score.db ~/shuttle_score_backup_$(date +%Y%m%d).db
+
+# 执行数据库迁移
+flask db upgrade
+
+# 创建超级管理员（交互式）
+flask create-superadmin
+
+# 或使用参数式
+flask create-superadmin --account myadmin --password MySecureP@ss
+```
+
+### 6. 配置 PythonAnywhere Web 应用
+
+在 PythonAnywhere 的 **Web** 页面：
 
 1. 点击 **Add a new web app**
-2. 选择你的域名 `your-username.eu.pythonanywhere.com`
-3. 选择 **Manual configuration**（不要选 Flask 模板，手动配置更灵活）
+2. 选择你的域名 `your-username.pythonanywhere.com`
+3. 选择 **Manual configuration**
 4. 选择 Python 版本（推荐 Python 3.10）
 
-然后在 Web 配置页面中找到 **WSGI configuration file** 的路径，点击编辑，替换为以下内容：
+创建完成后，在 Web 配置页面填写以下字段：
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| **Source code** | `/home/your-username/shuttle-score` | 项目根目录 |
+| **Working directory** | `/home/your-username/shuttle-score` | 工作目录（与 Source code 相同） |
+| **Virtualenv** | `/home/your-username/shuttle-score/.shuttle` | 虚拟环境目录 |
+
+> ⚠️ 将 `your-username` 替换为你的 PythonAnywhere 用户名。
+
+然后找到 **WSGI configuration file** 的路径，点击编辑，替换为以下内容：
 
 ```python
 import os
 import sys
 
-# 项目路径
+# 项目路径（替换 your-username）
 project_home = '/home/your-username/shuttle-score'
 
-# 添加项目路径到 Python 路径
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
 # 激活虚拟环境
-activate_this = project_home + '/.venv/bin/activate_this.py'
+activate_this = project_home + '/.shuttle/bin/activate_this.py'
 with open(activate_this) as f:
     exec(f.read(), {'__file__': activate_this})
 
-# 加载环境变量
-env_path = os.path.join(project_home, '.env')
-if os.path.exists(env_path):
-    with open(env_path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                key, value = line.split('=', 1)
-                os.environ[key.strip()] = value.strip()
-
-# 覆盖数据库路径为绝对路径
-os.environ['DATABASE_URI'] = 'sqlite:///' + os.path.join(project_home, 'shuttle_score.db')
+# 设置生产环境
+os.environ['FLASK_ENV'] = 'production'
 
 # 导入 Flask 应用
 from app import create_app
-
-# 创建应用并覆盖数据库配置
 app = create_app()
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI')
 ```
 
 > ⚠️ **重要**：将 `your-username` 替换为你的 PythonAnywhere 用户名。
 
-### 6. 修改 config.py 支持环境变量数据库路径
-
-为了让部署时数据库路径可配置，需要修改 `config.py`：
-
-```python
-import os
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-SQLALCHEMY_DATABASE_URI = os.environ.get(
-    'DATABASE_URI',
-    'sqlite:///' + os.path.join(BASE_DIR, 'shuttle_score.db')
-)
-SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'shuttle-score-secret-key-change-in-production')
-
-USER_TOKEN_EXPIRE_DAYS = 31
-ADMIN_TOKEN_EXPIRE_DAYS = 7
-
-SUPER_ADMIN_ACCOUNT = os.environ.get('SUPER_ADMIN_ACCOUNT', 'superadmin')
-SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD', 'admin123456')
-```
-
 ### 7. 配置静态文件
 
-在 PythonAnywhere 的 **Web** 配置页面中，找到 **Static files** 部分：
+在 Web 配置页面中，找到 **Static files** 部分：
 
 | URL | Directory |
 |-----|-----------|
@@ -159,15 +176,13 @@ SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD', 'admin123456')
 | `/js/` | `/home/your-username/shuttle-score/static/js` |
 | `/images/` | `/home/your-username/shuttle-score/static/images` |
 
-> ⚠️ **注意**：免费账号的静态文件通过这些映射提供。HTML 页面由 Flask 路由处理，不需要映射。
-
 ### 8. 重载 Web 应用
 
 在 Web 配置页面点击 **Reload** 按钮。
 
 ### 9. 验证部署
 
-访问 `https://your-username.eu.pythonanywhere.com/`，应该能看到首页。
+访问 `https://your-username.pythonanywhere.com/`，应该能看到首页。
 
 测试以下功能：
 
@@ -178,40 +193,30 @@ SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD', 'admin123456')
 - [ ] 录入比赛
 - [ ] 查询比赛
 - [ ] 数据统计
-- [ ] 管理后台 `https://your-username.eu.pythonanywhere.com/admin/login.html`
+- [ ] 管理后台 `https://your-username.pythonanywhere.com/admin/login.html`
 
-## 日常维护
+## 更新部署
 
-### 查看日志
-
-在 Web 配置页面中可以查看：
-
-- **Error log**：`/var/log/your-username.eu.pythonanywhere.com.error.log`
-- **Server log**：`/var/log/your-username.eu.pythonanywhere.com.server.log`
-
-也可以在 Bash 控制台中查看：
-
-```bash
-tail -50 /var/log/your-username.eu.pythonanywhere.com.error.log
-```
-
-### 更新代码
+当项目代码更新后：
 
 ```bash
 cd ~/shuttle-score
 git pull origin main
+source .shuttle/bin/activate
 
 # 如果依赖有变化
-source .venv/bin/activate
 pip install -r requirements.txt
 
-# 如果数据库模型有变化
-python3 init_db.py
+# 如果数据库模型有变化（安全升级，不丢数据）
+# ⚠️ 执行迁移前先备份数据库
+cp ~/shuttle-score/shuttle_score.db ~/shuttle_score_backup_$(date +%Y%m%d).db
+export FLASK_ENV=production
+flask db upgrade
 
-# 重载 Web 应用（也可以在 Web 页面点击 Reload）
+# 在 Web 配置页面点击 Reload
 ```
 
-### 数据库备份
+## 数据库备份
 
 ```bash
 # 备份
@@ -221,28 +226,57 @@ cp ~/shuttle-score/shuttle_score.db ~/shuttle_score_backup_$(date +%Y%m%d).db
 cp ~/shuttle_score_backup_20260529.db ~/shuttle-score/shuttle_score.db
 ```
 
+## 加密配置管理
+
+### 修改生产配置
+
+在本地机器上重新执行 `flask encrypt-env`，然后重新上传 `.env.prod` 文件。
+
+### 重新生成加密密钥
+
+如果密钥泄露，需要：
+
+1. 在本地执行 `flask encrypt-env` 生成新密钥和配置
+2. 重新上传 `.env.prod` 和 `.env.prod.key`
+3. 在 Web 配置页面点击 Reload
+
+### 重置管理员密码
+
+```bash
+cd ~/shuttle-score
+source .shuttle/bin/activate
+export FLASK_ENV=production
+flask create-superadmin --account newadmin --password NewP@ss123
+```
+
 ## 常见问题
 
 ### Q: 页面返回 404
 
 检查 WSGI 文件中的 `project_home` 路径是否正确，确保用户名已替换。
 
-### Q: 静态资源（CSS/JS/图片）加载失败
+### Q: 静态资源加载失败
 
 检查 Web 配置中 Static files 的 URL 映射和目录路径是否正确。
 
 ### Q: 数据库写入失败
-
-确认 `shuttle_score.db` 文件权限：
 
 ```bash
 chmod 644 ~/shuttle-score/shuttle_score.db
 chmod 755 ~/shuttle-score/
 ```
 
+### Q: 加密配置加载失败
+
+检查 `.env.prod` 和 `.env.prod.key` 是否在同一目录下，且密钥文件权限正确：
+
+```bash
+ls -la ~/shuttle-score/.env.prod*
+```
+
 ### Q: CPU 秒数用完
 
-免费账号每天 100 CPU 秒，如果超限网站会暂时不可用。优化建议：
+免费账号每天 100 CPU 秒，优化建议：
 
 - 减少统计页面的查询频率
 - 避免在高峰期执行大量数据操作
@@ -250,17 +284,12 @@ chmod 755 ~/shuttle-score/
 
 ### Q: 修改代码后不生效
 
-修改代码后需要在 Web 配置页面点击 **Reload** 按钮，或使用 API：
-
-```bash
-# 在 Bash 控制台中
-cd ~/shuttle-score
-python3 -c "import requests; requests.post('https://www.pythonanywhere.com/api/v0/user/your-username/webapps/your-username.eu.pythonanywhere.com/reload/', headers={'Authorization': 'Token your-api-token'})"
-```
+修改代码后需要在 Web 配置页面点击 **Reload** 按钮。
 
 ## 安全建议
 
-1. **修改默认密钥**：生产环境务必通过环境变量设置 `JWT_SECRET_KEY`
-2. **修改管理员密码**：不要使用默认的 `admin123456`
-3. **定期备份**：SQLite 数据库文件需要手动备份
-4. **注意文件可见性**：免费账号的文件对其他用户可见，不要在代码中硬编码敏感信息
+1. **加密配置**：生产环境使用 `flask encrypt-env` 加密敏感配置
+2. **密钥保管**：`.env.prod.key` 是解密核心，丢失将无法解密配置
+3. **文件权限**：设置 `chmod 600 .env.prod.key .env.prod`
+4. **定期备份**：SQLite 数据库文件需要手动备份
+5. **密钥备份**：在本地安全位置备份 `.env.prod.key`

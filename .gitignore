@@ -1,5 +1,5 @@
 # 虚拟环境
-.venv/
+.shuttle/
 
 # 测试数据文件
 test_data.md
@@ -36,4 +36,6 @@ __pycache__/
 
 # 环境变量
 .env
-.env.*
+.env.dev
+.env.local
+.env.prod.key

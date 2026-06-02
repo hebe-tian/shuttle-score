@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, current_app
 from extensions import db
 from models.user import User, Admin
 from models.match import Match, MatchPlayer, MatchScore
@@ -9,7 +9,6 @@ from utils.auth_decorator import admin_token_required, super_admin_required
 from werkzeug.security import generate_password_hash
 import time
 import jwt
-from config import JWT_SECRET_KEY, ADMIN_TOKEN_EXPIRE_DAYS
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -34,8 +33,8 @@ def admin_login():
         'type': 'admin',
         'admin_id': admin.id,
         'role': admin.role,
-        'exp': int(time.time()) + ADMIN_TOKEN_EXPIRE_DAYS * 86400
-    }, JWT_SECRET_KEY, algorithm='HS256')
+        'exp': int(time.time()) + current_app.config['ADMIN_TOKEN_EXPIRE_DAYS'] * 86400
+    }, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
 
     return success({
         "token": token,

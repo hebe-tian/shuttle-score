@@ -1,7 +1,6 @@
 from functools import wraps
-from flask import request
+from flask import request, current_app
 import jwt
-from config import JWT_SECRET_KEY
 from utils.response import unauthorized, forbidden
 from models.user import User, Admin
 
@@ -14,7 +13,8 @@ def token_required(f):
             return unauthorized("未登录或Token过期")
         token = token[7:]
         try:
-            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+            secret = current_app.config['JWT_SECRET_KEY']
+            data = jwt.decode(token, secret, algorithms=['HS256'])
             if data.get('type') != 'user':
                 return forbidden("无权限访问")
             user = User.query.get(data['user_id'])
@@ -37,7 +37,8 @@ def admin_token_required(f):
             return unauthorized("未登录或Token过期")
         token = token[7:]
         try:
-            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+            secret = current_app.config['JWT_SECRET_KEY']
+            data = jwt.decode(token, secret, algorithms=['HS256'])
             if data.get('type') != 'admin':
                 return forbidden("无权限访问")
             admin = Admin.query.get(data['admin_id'])
@@ -60,7 +61,8 @@ def super_admin_required(f):
             return unauthorized("未登录或Token过期")
         token = token[7:]
         try:
-            data = jwt.decode(token, JWT_SECRET_KEY, algorithms=['HS256'])
+            secret = current_app.config['JWT_SECRET_KEY']
+            data = jwt.decode(token, secret, algorithms=['HS256'])
             if data.get('type') != 'admin':
                 return forbidden("无权限访问")
             admin = Admin.query.get(data['admin_id'])

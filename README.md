@@ -141,15 +141,18 @@ git clone <repository-url>
 cd shuttle-score
 
 # 创建虚拟环境
-python3 -m venv .venv
-source .venv/bin/activate  # macOS/Linux
-# .venv\Scripts\activate   # Windows
+python3 -m venv .shuttle
+source .shuttle/bin/activate  # macOS/Linux
+# .shuttle\Scripts\activate   # Windows
 
 # 安装依赖
 pip install -r requirements.txt
 
 # 初始化数据库
-python3 init_db.py
+flask db upgrade
+
+# 创建超级管理员
+flask create-superadmin
 
 # 启动开发服务器
 python3 app.py
@@ -157,25 +160,46 @@ python3 app.py
 
 访问 http://127.0.0.1:5000 即可使用。
 
+> 详细开发指南请参考 [LOCAL.md](LOCAL.md)，生产部署请参考 [DEPLOY.md](DEPLOY.md)。
+
 ### 默认管理员
 
+开发环境默认管理员：
 - 账号：`superadmin`
 - 密码：`admin123456`
 
-可通过环境变量 `SUPER_ADMIN_ACCOUNT` 和 `SUPER_ADMIN_PASSWORD` 自定义。
+生产环境通过 `flask create-superadmin` 命令交互式创建。
 
 ## 配置说明
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
+### 环境区分
+
+| 环境 | FLASK_ENV | 配置来源 |
+|------|-----------|---------|
+| 开发 | `development`（默认） | `config.py` 中的 `DevelopmentConfig` |
+| 生产 | `production` | 加密的 `.env.prod` 文件（通过 `flask encrypt-env` 生成） |
+
+### 开发环境配置
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
 | `SQLALCHEMY_DATABASE_URI` | `sqlite:///shuttle_score.db` | 数据库连接 |
-| `JWT_SECRET_KEY` | `shuttle-score-secret-key-change-in-production` | JWT 签名密钥 |
+| `JWT_SECRET_KEY` | `dev-secret-key` | JWT 签名密钥（仅开发用） |
 | `USER_TOKEN_EXPIRE_DAYS` | 31 | 用户 Token 有效期（天） |
 | `ADMIN_TOKEN_EXPIRE_DAYS` | 7 | 管理员 Token 有效期（天） |
-| `SUPER_ADMIN_ACCOUNT` | `superadmin` | 超级管理员账号 |
-| `SUPER_ADMIN_PASSWORD` | `admin123456` | 超级管理员密码 |
 
-生产环境请务必通过环境变量修改 `JWT_SECRET_KEY` 和管理员密码。
+### 生产环境配置
+
+生产环境敏感配置通过 `flask encrypt-env` 加密存储，使用 Fernet 对称加密。
+
+### Flask CLI 命令
+
+| 命令 | 说明 |
+|------|------|
+| `flask deploy` | 交互式部署初始化 |
+| `flask create-superadmin` | 创建/更新超级管理员 |
+| `flask encrypt-env` | 加密生产环境配置 |
+| `flask db upgrade` | 执行数据库迁移 |
 
 ## 设计说明
 

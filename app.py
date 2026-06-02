@@ -1,14 +1,22 @@
+import os
 from flask import Flask
-from extensions import db
-from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
+from extensions import db, migrate
+from config import config_map
+from crypto_utils import load_encrypted_config
 
 
 def create_app():
+    env = os.environ.get('FLASK_ENV', 'development')
+    config_class = config_map.get(env, config_map['development'])
+
     app = Flask(__name__, static_folder='static', static_url_path='')
-    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
+    app.config.from_object(config_class)
+
+    if env == 'production':
+        load_encrypted_config(app)
 
     db.init_app(app)
+    migrate.init_app(app, db)
 
     with app.app_context():
         from api.auth import auth_bp
@@ -22,6 +30,9 @@ def create_app():
         app.register_blueprint(matches_bp, url_prefix='/api/matches')
         app.register_blueprint(stats_bp, url_prefix='/api/stats')
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
+
+    from cli import register_cli
+    register_cli(app)
 
     @app.route('/')
     def index():
