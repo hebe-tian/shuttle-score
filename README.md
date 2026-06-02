@@ -5,60 +5,64 @@
 ## 技术栈
 
 - **后端**：Python 3 / Flask 3.0 / SQLAlchemy / SQLite
+- **数据库迁移**：Flask-Migrate（Alembic）
+- **配置加密**：cryptography（Fernet 对称加密）
 - **前端**：原生 HTML / CSS / JavaScript（无构建工具）
 - **认证**：JWT（PyJWT 2.8）
 - **图表**：Chart.js
-- **数据库**：SQLite
 
 ## 项目结构
 
 ```
 shuttle-score/
 ├── app.py                  # Flask 应用工厂
-├── config.py               # 配置（数据库路径、JWT密钥、Token过期时间）
-├── extensions.py            # SQLAlchemy 实例
-├── init_db.py               # 数据库初始化脚本（创建表 + 超级管理员）
-├── requirements.txt         # Python 依赖
-├── api/                     # 后端 API 蓝图
-│   ├── auth.py              # 用户注册/登录/个人资料
-│   ├── players.py           # 选手管理
-│   ├── matches.py            # 比赛录入/查询
-│   ├── stats.py             # 数据统计（胜率、得分）
-│   └── admin.py             # 管理后台 API
-├── models/                  # 数据模型
-│   ├── user.py              # User / Admin 模型
-│   ├── player.py            # Player 模型
-│   └── match.py             # Match / MatchPlayer / MatchScore 模型
-├── utils/                   # 工具模块
-│   ├── response.py          # 统一响应格式
-│   ├── auth_decorator.py    # JWT 认证装饰器
-│   ├── validators.py        # 输入校验
-│   └── trace.py             # 链路追踪
-└── static/                  # 前端静态资源
+├── config.py               # 多环境配置类（Development / Production）
+├── extensions.py           # SQLAlchemy + Migrate 实例
+├── cli.py                  # Flask CLI 命令（deploy / create-superadmin / encrypt-env）
+├── crypto_utils.py         # Fernet 加密/解密工具
+├── requirements.txt        # Python 依赖
+├── api/                    # 后端 API 蓝图
+│   ├── auth.py             # 用户注册/登录/个人资料
+│   ├── players.py          # 选手管理
+│   ├── matches.py          # 比赛录入/查询
+│   ├── stats.py            # 数据统计（胜率、得分）
+│   └── admin.py            # 管理后台 API
+├── models/                 # 数据模型
+│   ├── user.py             # User / Admin 模型
+│   ├── player.py           # Player 模型（含 user_id 绑定字段）
+│   └── match.py            # Match / MatchPlayer / MatchScore 模型
+├── utils/                  # 工具模块
+│   ├── response.py         # 统一响应格式
+│   ├── auth_decorator.py   # JWT 认证装饰器
+│   ├── validators.py       # 输入校验
+│   └── trace.py            # 链路追踪
+├── migrations/             # 数据库迁移脚本（Flask-Migrate）
+│   └── versions/           # 迁移版本文件
+└── static/                 # 前端静态资源
     ├── css/
-    │   ├── base.css         # CSS 变量与全局样式
-    │   ├── components.css   # 组件样式
-    │   └── admin.css        # 管理后台样式
+    │   ├── base.css        # CSS 变量与全局样式
+    │   ├── components.css  # 组件样式
+    │   └── admin.css       # 管理后台样式
     ├── js/
-    │   ├── api.js           # API 请求封装
-    │   ├── auth.js          # 认证状态管理
-    │   ├── nav.js           # 导航栏/TabBar/Toast/比赛卡片渲染
-    │   ├── players.js       # 选手管理页面逻辑
-    │   ├── matches.js       # 比赛录入页面逻辑
-    │   ├── stats.js         # 数据统计页面逻辑
-    │   └── admin.js         # 管理后台页面逻辑
+    │   ├── api.js          # API 请求封装
+    │   ├── auth.js         # 认证状态管理
+    │   ├── nav.js          # 导航栏/TabBar/Toast/比赛卡片渲染
+    │   ├── players.js      # 选手管理页面逻辑
+    │   ├── matches.js      # 比赛录入页面逻辑
+    │   ├── stats.js        # 数据统计页面逻辑
+    │   └── admin.js        # 管理后台页面逻辑
     ├── images/
-    │   └── logo.png         # 网站 Logo
-    └── pages/               # HTML 页面
-        ├── index.html       # 首页
-        ├── login.html       # 登录
-        ├── register.html    # 注册
-        ├── myhomepage.html  # 我的主页
-        ├── matches.html      # 比赛录入
-        ├── match-query.html # 比赛查询
-        ├── stats.html       # 数据统计
-        ├── profile.html     # 个人设置
-        └── admin/           # 管理后台页面
+    │   └── logo.png        # 网站 Logo
+    └── pages/              # HTML 页面
+        ├── index.html      # 首页
+        ├── login.html      # 登录
+        ├── register.html   # 注册
+        ├── myhomepage.html # 我的主页
+        ├── matches.html    # 比赛录入
+        ├── match-query.html# 比赛查询
+        ├── stats.html      # 数据统计
+        ├── profile.html    # 个人设置
+        └── admin/          # 管理后台页面
 ```
 
 ## 功能概览
@@ -67,7 +71,7 @@ shuttle-score/
 
 | 功能 | 说明 |
 |------|------|
-| 注册/登录 | 两步注册（账号密码 → 用户名性别），JWT 认证 |
+| 注册/登录 | 两步注册（账号密码 → 用户名性别），注册时自动创建同名选手，JWT 认证 |
 | 选手管理 | 添加选手（姓名+性别），按性别筛选 |
 | 比赛录入 | 4 步流程：选类型 → 选选手 → 录比分 → 确认提交 |
 | 比赛查询 | 按类型/时间/选手筛选，分页浏览 |
@@ -183,7 +187,7 @@ python3 app.py
 
 | 配置项 | 值 | 说明 |
 |--------|-----|------|
-| `SQLALCHEMY_DATABASE_URI` | `sqlite:///shuttle_score.db` | 数据库连接 |
+| `SQLALCHEMY_DATABASE_URI` | `sqlite:///shuttle_score.db` | 数据库连接（基于项目目录） |
 | `JWT_SECRET_KEY` | `dev-secret-key` | JWT 签名密钥（仅开发用） |
 | `USER_TOKEN_EXPIRE_DAYS` | 31 | 用户 Token 有效期（天） |
 | `ADMIN_TOKEN_EXPIRE_DAYS` | 7 | 管理员 Token 有效期（天） |
@@ -192,14 +196,36 @@ python3 app.py
 
 生产环境敏感配置通过 `flask encrypt-env` 加密存储，使用 Fernet 对称加密。
 
+| 配置项 | 说明 |
+|--------|------|
+| `JWT_SECRET_KEY` | JWT 签名密钥（留空自动生成） |
+| `SUPER_ADMIN_ACCOUNT` | 超级管理员账号 |
+| `SUPER_ADMIN_PASSWORD` | 超级管理员密码（留空自动生成） |
+| `USER_TOKEN_EXPIRE_DAYS` | 用户 Token 有效期（天） |
+| `ADMIN_TOKEN_EXPIRE_DAYS` | 管理员 Token 有效期（天） |
+
+> `DATABASE_URI` 不需要手动配置，生产环境自动使用项目目录下的 `shuttle_score.db`。
+
 ### Flask CLI 命令
 
 | 命令 | 说明 |
 |------|------|
-| `flask deploy` | 交互式部署初始化 |
+| `flask deploy` | 交互式部署初始化（迁移 + 创建管理员 + 验证） |
 | `flask create-superadmin` | 创建/更新超级管理员 |
 | `flask encrypt-env` | 加密生产环境配置 |
 | `flask db upgrade` | 执行数据库迁移 |
+| `flask db migrate -m "描述"` | 生成迁移脚本 |
+
+## 数据模型
+
+### User / Player 关系
+
+| 字段 | Player | 说明 |
+|------|--------|------|
+| `created_by` | 谁录入了这个选手 | 注册时 = 用户自身，手动添加 = 添加者 |
+| `user_id` | 选手绑定的注册用户 | 注册时自动绑定，手动添加为 null |
+
+注册时自动创建同名同性别的 Player 记录（`created_by` 和 `user_id` 均为用户自身 ID）。手动添加的选手 `user_id` 为 null，未来可通过邀请码绑定。
 
 ## 设计说明
 
@@ -208,3 +234,6 @@ python3 app.py
 - **多局比赛**：每局比分作为独立 Match 记录保存，各自计算胜负
 - **时间戳**：所有时间戳使用 Unix 秒级时间戳（UTC+8 北京时间）
 - **前端无构建**：纯原生 HTML/CSS/JS，无需 Node.js 或打包工具
+- **配置加密**：生产环境使用 Fernet 对称加密，密钥与配置分离存储
+- **数据库迁移**：Flask-Migrate 管理表结构变更，生产环境安全升级不丢数据
+- **注册即选手**：用户注册时自动创建同名选手，录入比赛时可直接选择自己

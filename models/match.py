@@ -31,6 +31,7 @@ class Match(db.Model):
             "id": self.id,
             "type": self.type,
             "match_time": self.match_time,
+            "players": [mp.to_dict() for mp in self.players.all()],
             "scores": [ms.to_dict() for ms in self.scores.order_by(MatchScore.game_number).all()]
         }
 

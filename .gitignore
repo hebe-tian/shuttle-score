@@ -29,6 +29,9 @@ report/
 .DS_Store
 Thumbs.db
 
+# 源文件备份
+*_original.*
+
 # Flask 调试相关
 __pycache__/
 *.pyc

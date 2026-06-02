@@ -56,20 +56,7 @@
             const res = await ShuttleAPI.matches.random();
             const container = document.getElementById('random-matches');
             if (res.ok && res.data && res.data.length > 0) {
-                container.innerHTML = res.data.map(m => {
-                    const typeLabel = ShuttleNav.getMatchTypeLabel(m.type);
-                    const scores = m.scores || [];
-                    const scoreStr = scores.map(s => `${s.team1_score}:${s.team2_score}`).join(' / ');
-                    return `
-                        <div class="match-card">
-                            <div class="match-card-header">
-                                <span class="tag tag-${m.type}">${typeLabel}</span>
-                                <span class="match-card-date">${ShuttleNav.formatTime(m.match_time)}</span>
-                            </div>
-                            <div class="match-card-score">${scoreStr || '-'}</div>
-                        </div>
-                    `;
-                }).join('');
+                container.innerHTML = res.data.map(m => ShuttleNav.renderMatchCard(m)).join('');
             } else {
                 container.innerHTML = `
                     <div class="empty-state" style="grid-column:1/-1;">
