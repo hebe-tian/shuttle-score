@@ -37,6 +37,9 @@ def decrypt_value(ciphertext, key):
     return f.decrypt(ciphertext[len(ENC_PREFIX):].encode()).decode()
 
 
+INT_CONFIG_KEYS = {'USER_TOKEN_EXPIRE_DAYS', 'ADMIN_TOKEN_EXPIRE_DAYS'}
+
+
 def load_encrypted_config(app, base_dir=None):
     base = base_dir or os.path.abspath(os.path.dirname(__file__))
     key = load_key(os.path.join(base, KEY_FILE))
@@ -57,11 +60,9 @@ def load_encrypted_config(app, base_dir=None):
             v = v.strip()
             if v.startswith(ENC_PREFIX):
                 v = decrypt_value(v, key)
+            if k in INT_CONFIG_KEYS:
+                try:
+                    v = int(v)
+                except (ValueError, TypeError):
+                    pass
             app.config[k] = v
-
-    if 'JWT_SECRET_KEY' in app.config:
-        app.config['JWT_SECRET_KEY'] = app.config['JWT_SECRET_KEY']
-    if 'SUPER_ADMIN_ACCOUNT' in app.config:
-        app.config['SUPER_ADMIN_ACCOUNT'] = app.config['SUPER_ADMIN_ACCOUNT']
-    if 'SUPER_ADMIN_PASSWORD' in app.config:
-        app.config['SUPER_ADMIN_PASSWORD'] = app.config['SUPER_ADMIN_PASSWORD']

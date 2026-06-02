@@ -152,10 +152,11 @@ project_home = '/home/your-username/shuttle-score'
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
-# 激活虚拟环境
-activate_this = project_home + '/.shuttle/bin/activate_this.py'
-with open(activate_this) as f:
-    exec(f.read(), {'__file__': activate_this})
+# 激活虚拟环境（Python 3.9+ 不再包含 activate_this.py，改用 site-packages 方式）
+venv_site_packages = project_home + '/.shuttle/lib/python3.13/site-packages'
+if os.path.exists(venv_site_packages):
+    if venv_site_packages not in sys.path:
+        sys.path.insert(0, venv_site_packages)
 
 # 设置生产环境
 os.environ['FLASK_ENV'] = 'production'
@@ -163,6 +164,7 @@ os.environ['FLASK_ENV'] = 'production'
 # 导入 Flask 应用
 from app import create_app
 app = create_app()
+application = app
 ```
 
 > ⚠️ **重要**：将 `your-username` 替换为你的 PythonAnywhere 用户名。
