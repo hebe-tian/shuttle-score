@@ -3,6 +3,7 @@ import jwt
 import time
 from extensions import db
 from models.user import User
+from models.player import Player
 from utils.response import success, bad_request, conflict, unauthorized, not_found
 from utils.validators import validate_account, validate_password, validate_username
 from utils.auth_decorator import token_required
@@ -83,6 +84,17 @@ def register():
         )
         user.set_password(password)
         db.session.add(user)
+        db.session.flush()
+
+        player = Player(
+            name=username,
+            gender=gender,
+            created_by=user.id,
+            user_id=user.id,
+            created_at=now
+        )
+        db.session.add(player)
+
         db.session.commit()
 
         return success({"user_id": user.id, "account": user.account, "username": user.username})
