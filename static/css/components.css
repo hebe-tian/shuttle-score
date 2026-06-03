@@ -284,6 +284,10 @@
     background: var(--white);
     transition: border-color 0.2s;
     outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 44px;
+    box-sizing: border-box;
 }
 
 .form-input:focus {
