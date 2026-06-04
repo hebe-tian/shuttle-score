@@ -42,3 +42,7 @@ __pycache__/
 .env.dev
 .env.local
 .env.prod.key
+
+# 升级日志
+deploy-0603.md
+local-0603.md

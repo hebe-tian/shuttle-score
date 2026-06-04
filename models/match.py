@@ -8,6 +8,7 @@ class Match(db.Model):
     type = db.Column(db.Text, nullable=False)
     match_time = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    deleted = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.Integer, nullable=False)
 
     players = db.relationship('MatchPlayer', backref='match', lazy='dynamic')

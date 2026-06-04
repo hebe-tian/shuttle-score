@@ -205,7 +205,7 @@ def admin_query_matches():
     page = validate_page(data.get('page', 1))
     page_size = validate_page_size(data.get('page_size', 20))
 
-    query = Match.query
+    query = Match.query.filter_by(deleted=0)
 
     match_type = data.get('type')
     if match_type and match_type in VALID_MATCH_TYPES:
@@ -262,7 +262,7 @@ def admin_get_players():
     page = validate_page(request.args.get('page', 1))
     page_size = validate_page_size(request.args.get('page_size', 20))
 
-    query = Player.query
+    query = Player.query.filter_by(deleted=0)
     total = query.count()
     players = query.order_by(Player.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 

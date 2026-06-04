@@ -44,6 +44,7 @@
         </div>
     </div>
 
+    <!-- 录入选手弹窗 -->
     <div id="add-player-modal" class="modal-overlay">
         <div class="modal">
             <div class="modal-title">录入选手</div>
@@ -65,6 +66,92 @@
                     <button type="submit" class="btn btn-primary btn-sm">添加</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 编辑选手弹窗 -->
+    <div id="edit-player-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">编辑选手</div>
+            <form id="edit-player-form">
+                <div class="form-group">
+                    <label class="form-label">选手名称</label>
+                    <input type="text" id="edit-player-name" class="form-input" placeholder="留空则不修改">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">绑定用户ID（可选）</label>
+                    <input type="text" id="edit-player-user-id" class="form-input" placeholder="输入用户ID建立绑定">
+                </div>
+                <div id="edit-player-error" class="form-error"></div>
+                <div class="modal-actions">
+                    <button type="button" id="close-edit-player" class="btn btn-outline btn-sm">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 删除确认弹窗 -->
+    <div id="delete-player-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">确认删除</div>
+            <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;">删除后无法撤销，该选手已录入的成绩不会被删除。</p>
+            <div class="modal-actions">
+                <button type="button" id="close-delete-player" class="btn btn-outline btn-sm">取消</button>
+                <button type="button" id="confirm-delete-player" class="btn btn-danger btn-sm">确认删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 绑定弹窗 -->
+    <div id="bind-player-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">绑定用户</div>
+
+            <div class="form-group">
+                <label class="form-label">方式一：邀请注册</label>
+                <button type="button" id="generate-invite-btn" class="btn btn-outline btn-sm">生成邀请链接</button>
+                <div id="invite-link-area" style="display:none;margin-top:8px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span id="invite-link-text" style="font-size:12px;color:var(--primary);word-break:break-all;flex:1;"></span>
+                        <button type="button" id="copy-invite-link" class="btn btn-outline btn-sm">复制</button>
+                    </div>
+                    <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">链接24小时内有效</p>
+                </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
+
+            <div class="form-group">
+                <label class="form-label">方式二：输入用户ID</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="bind-user-id-input" class="form-input" placeholder="输入用户ID" style="flex:1;">
+                    <button type="button" id="bind-user-id-submit" class="btn btn-primary btn-sm">绑定</button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" id="close-bind-player" class="btn btn-outline btn-sm">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 绑定用户信息弹窗 -->
+    <div id="bind-user-info-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-title">绑定用户信息</div>
+            <div class="form-group">
+                <label class="form-label">用户名</label>
+                <p id="bind-user-info-username" style="font-size:14px;color:var(--text-primary);"></p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">账号</label>
+                <p id="bind-user-info-account" style="font-size:14px;color:var(--text-primary);"></p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="unbind-user-btn" class="btn btn-danger btn-sm">解绑</button>
+                <button type="button" id="close-bind-user-info" class="btn btn-outline btn-sm">关闭</button>
+            </div>
         </div>
     </div>
 
@@ -111,31 +198,10 @@
                     document.getElementById('player-expand').style.display = 'block';
                 } else {
                     this.renderPlayerList(allPlayers);
-                    document.getElementById('player-expand').style.display = allPlayers.length > PLAYER_PAGE_SIZE ? 'none' : 'none';
+                    document.getElementById('player-expand').style.display = 'none';
                 }
             }
             return res;
-        };
-
-        const origRenderPlayerList = ShuttlePlayers.renderPlayerList.bind(ShuttlePlayers);
-        ShuttlePlayers.renderPlayerList = function(players) {
-            const container = document.getElementById('player-list');
-            if (!container) return;
-
-            if (!players || players.length === 0) {
-                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">还没有选手，快去添加吧</div></div>';
-                return;
-            }
-
-            container.innerHTML = players.map(p => `
-                <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <strong>${p.name}</strong>
-                        <span style="margin-left:8px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;color:#fff;background:${p.gender === 'male' ? 'var(--gender-male)' : 'var(--gender-female)'};">${p.gender === 'male' ? '男' : '女'}</span>
-                    </div>
-                    <span style="font-size:12px;color:var(--text-muted);">${ShuttleNav.formatDate(p.created_at)}</span>
-                </div>
-            `).join('');
         };
 
         document.getElementById('expand-players-btn')?.addEventListener('click', () => {

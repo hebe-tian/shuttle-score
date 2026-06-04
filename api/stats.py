@@ -16,7 +16,7 @@ def win_rate_stats():
     user = request.current_user
     data = request.get_json(silent=True) or {}
 
-    query = Match.query.filter_by(created_by=user.id)
+    query = Match.query.filter_by(created_by=user.id, deleted=0)
 
     match_type = data.get('type')
     if match_type:
@@ -44,7 +44,8 @@ def win_rate_stats():
     if member_name:
         subquery = MatchPlayer.query.join(Player).filter(
             Player.name.contains(member_name),
-            Player.created_by == user.id
+            Player.created_by == user.id,
+            Player.deleted == 0
         ).with_entities(MatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
@@ -88,7 +89,7 @@ def score_stats():
     user = request.current_user
     data = request.get_json(silent=True) or {}
 
-    query = Match.query.filter_by(created_by=user.id)
+    query = Match.query.filter_by(created_by=user.id, deleted=0)
 
     match_type = data.get('type')
     if match_type:
@@ -116,7 +117,8 @@ def score_stats():
     if member_name:
         subquery = MatchPlayer.query.join(Player).filter(
             Player.name.contains(member_name),
-            Player.created_by == user.id
+            Player.created_by == user.id,
+            Player.deleted == 0
         ).with_entities(MatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
