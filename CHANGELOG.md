@@ -6,6 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- 选手逻辑删除功能（Player 模型新增 `deleted` 字段，默认值 0）
+- 选手邀请注册功能（Player 模型新增 `invite_expires_at` 字段，使用 player_id 作为邀请码，24小时有效）
+- 比赛逻辑删除预留（Match 模型新增 `deleted` 字段，默认值 0）
+- 选手编辑 API：`POST /api/players/update`（修改名称、绑定用户ID）
+- 选手删除 API：`POST /api/players/delete`（逻辑删除，关联成绩保留）
+- 选手解绑 API：`POST /api/players/unbind`
+- 选手邀请 API：`POST /api/players/invite`（生成邀请链接，24小时有效）
+- 绑定用户信息查询 API：`GET /api/players/bind-user?id=<player_id>`
+- 注册流程支持邀请码参数（`invite` 参数，注册后自动绑定选手）
+- 前端选手卡片增加操作按钮（绑定、编辑、删除）
+- 前端绑定弹窗（邀请注册 + 输入用户ID两种方式）
+- 前端编辑选手弹窗（修改名称、绑定用户ID）
+- 前端删除确认弹窗（提示无法撤销、成绩不删除）
+- 前端绑定用户信息弹窗（显示用户名和账号，支持解绑）
+- 已绑定选手名称下划线样式，点击查看绑定用户信息
+- 邀请链接复制功能
+- 所有查询接口增加 `deleted=0` 过滤（选手列表、比赛查询、统计、随机比赛、管理员查询）
+- 部署文档 `local-0603.md` 和 `deploy-0603.md`
+
 - Player 模型新增 `user_id` 字段（nullable, ForeignKey→users.id），用于选手与注册用户的绑定
 - 注册时自动创建同名同性别的 Player 记录（`created_by` 和 `user_id` 均为用户自身 ID）
 - 多环境配置系统（`DevelopmentConfig` / `ProductionConfig`），通过 `FLASK_ENV` 切换
