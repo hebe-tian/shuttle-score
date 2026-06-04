@@ -35,7 +35,7 @@ def create_match():
     if len(player_ids) != expected_count:
         return bad_request(f"{match_type}需要{expected_count}名选手")
 
-    players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id).all()
+    players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
     if len(players) != len(player_ids):
         return bad_request("选手不存在或不属于当前用户")
 
@@ -130,7 +130,7 @@ def query_matches():
     page = validate_page(data.get('page', 1))
     page_size = validate_page_size(data.get('page_size', 10))
 
-    query = Match.query.filter_by(created_by=user.id)
+    query = Match.query.filter_by(created_by=user.id, deleted=0)
 
     start_time = data.get('start_time')
     end_time = data.get('end_time')
@@ -158,7 +158,8 @@ def query_matches():
     if member_name:
         subquery = MatchPlayer.query.join(Player).filter(
             Player.name.contains(member_name),
-            Player.created_by == user.id
+            Player.created_by == user.id,
+            Player.deleted == 0
         ).with_entities(MatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
@@ -182,7 +183,7 @@ def query_matches():
 @token_required
 def get_match(match_id):
     user = request.current_user
-    match = Match.query.filter_by(id=match_id, created_by=user.id).first()
+    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
     if not match:
         return not_found("比赛记录不存在")
     return success(match.to_dict(include_details=True))
@@ -190,12 +191,13 @@ def get_match(match_id):
 
 @matches_bp.route('/random', methods=['GET'])
 def random_matches():
-    total = Match.query.count()
+    total = Match.query.filter_by(deleted=0).count()
     if total == 0:
         return success([])
 
     count = min(7, total)
-    sample_ids = random.sample(range(1, total + 1), min(count, total)) if total <= 7 else [m.id for m in Match.query.order_by(db.func.random()).limit(count).all()]
+    all_ids = [m.id for m in Match.query.filter_by(deleted=0).with_entities(Match.id).all()]
+    sample_ids = random.sample(all_ids, min(count, total))
 
     matches = Match.query.filter(Match.id.in_(sample_ids)).all()
     result = [m.to_public_dict() for m in matches]

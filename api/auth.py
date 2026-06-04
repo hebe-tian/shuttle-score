@@ -44,6 +44,7 @@ def register():
         temp_token = data.get('temp_token', '')
         username = data.get('username', '').strip()
         gender = data.get('gender', '')
+        invite = data.get('invite')
 
         ok, msg = validate_username(username)
         if not ok:
@@ -73,6 +74,22 @@ def register():
         if User.query.filter_by(username=username).first():
             return conflict("用户名已存在")
 
+        invite_player = None
+        if invite:
+            try:
+                invite = int(invite)
+            except (ValueError, TypeError):
+                return bad_request("邀请参数无效")
+
+            invite_player = Player.query.filter_by(id=invite, deleted=0).first()
+            if not invite_player:
+                return bad_request("邀请链接无效")
+            if invite_player.user_id:
+                return bad_request("该选手已被绑定")
+            now_ts = int(time.time())
+            if invite_player.invite_expires_at <= 0 or invite_player.invite_expires_at < now_ts:
+                return bad_request("邀请链接已过期")
+
         now = int(time.time())
         user = User(
             account=account,
@@ -95,9 +112,17 @@ def register():
         )
         db.session.add(player)
 
+        if invite_player:
+            invite_player.user_id = user.id
+            invite_player.invite_expires_at = 0
+
         db.session.commit()
 
-        return success({"user_id": user.id, "account": user.account, "username": user.username})
+        result = {"user_id": user.id, "account": user.account, "username": user.username}
+        if invite_player:
+            result["bound_player"] = invite_player.name
+
+        return success(result)
 
     return bad_request("无效的步骤")
 

@@ -849,3 +849,23 @@
         padding: 8px 4px;
     }
 }
+
+.player-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.player-name-bound {
+    font-weight: bold;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    color: var(--primary-darker);
+    transition: color 0.2s;
+}
+
+.player-name-bound:hover {
+    color: var(--primary);
+}

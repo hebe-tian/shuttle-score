@@ -9,6 +9,8 @@ class Player(db.Model):
     gender = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    deleted = db.Column(db.Integer, default=0, nullable=False)
+    invite_expires_at = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.Integer, nullable=False)
 
     def to_dict(self):
@@ -18,5 +20,7 @@ class Player(db.Model):
             "gender": self.gender,
             "created_by": self.created_by,
             "user_id": self.user_id,
+            "deleted": self.deleted,
+            "invite_expires_at": self.invite_expires_at,
             "created_at": self.created_at
         }

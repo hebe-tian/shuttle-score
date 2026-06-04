@@ -60,8 +60,10 @@ const ShuttleAPI = {
         registerStep1(account, password) {
             return ShuttleAPI.post('/api/auth/register', { step: 1, account, password });
         },
-        registerStep2(temp_token, username, gender) {
-            return ShuttleAPI.post('/api/auth/register', { step: 2, temp_token, username, gender }, { tempToken: null });
+        registerStep2(temp_token, username, gender, invite) {
+            const data = { step: 2, temp_token, username, gender };
+            if (invite) data.invite = invite;
+            return ShuttleAPI.post('/api/auth/register', data, { tempToken: null });
         },
         login(account, password) {
             return ShuttleAPI.post('/api/auth/login', { account, password });
@@ -84,6 +86,21 @@ const ShuttleAPI = {
         },
         add(name, gender) {
             return ShuttleAPI.post('/api/players', { name, gender });
+        },
+        update(player_id, data) {
+            return ShuttleAPI.post('/api/players/update', { player_id, ...data });
+        },
+        delete(player_id) {
+            return ShuttleAPI.post('/api/players/delete', { player_id });
+        },
+        unbind(player_id) {
+            return ShuttleAPI.post('/api/players/unbind', { player_id });
+        },
+        invite(player_id) {
+            return ShuttleAPI.post('/api/players/invite', { player_id });
+        },
+        getBindUser(player_id) {
+            return ShuttleAPI.get('/api/players/bind-user?id=' + player_id);
         }
     },
 

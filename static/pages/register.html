@@ -108,10 +108,15 @@
 
         let tempToken = '';
         let selectedGender = '';
+        let inviteParam = '';
 
         if (ShuttleAuth.isLoggedIn()) {
             window.location.href = '/pages/myhomepage.html';
         }
+
+        // 检测邀请参数
+        const urlParams = new URLSearchParams(window.location.search);
+        inviteParam = urlParams.get('invite') || '';
 
         document.querySelectorAll('.gender-option').forEach(el => {
             el.addEventListener('click', () => {
@@ -171,23 +176,27 @@
             btn.classList.add('btn-loading');
             btn.disabled = true;
 
-            const res = await ShuttleAPI.auth.registerStep2(tempToken, username, selectedGender);
+            const res = await ShuttleAPI.auth.registerStep2(tempToken, username, selectedGender, inviteParam);
             btn.classList.remove('btn-loading');
             btn.disabled = false;
 
             if (res.ok) {
+                let successMsg = '注册成功';
+                if (res.data.bound_player) {
+                    successMsg = '注册成功，已与选手「' + res.data.bound_player + '」绑定';
+                }
                 const account = document.getElementById('reg-account').value.trim();
                 const password = document.getElementById('reg-password').value;
                 const loginRes = await ShuttleAPI.auth.login(account, password);
                 if (loginRes.ok) {
                     ShuttleAuth.saveToken(loginRes.data.token);
                     ShuttleAuth.saveUser(loginRes.data.user);
-                    ShuttleNav.showToast('注册成功');
+                    ShuttleNav.showToast(successMsg);
                     setTimeout(() => {
                         window.location.href = '/pages/myhomepage.html';
                     }, 800);
                 } else {
-                    ShuttleNav.showToast('注册成功，请登录');
+                    ShuttleNav.showToast(successMsg + '，请登录');
                     setTimeout(() => {
                         window.location.href = '/pages/login.html';
                     }, 1000);
