@@ -24,12 +24,14 @@ def create_app():
         from api.matches import matches_bp
         from api.stats import stats_bp
         from api.admin import admin_bp
+        from api.settings import settings_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(players_bp, url_prefix='/api/players')
         app.register_blueprint(matches_bp, url_prefix='/api/matches')
         app.register_blueprint(stats_bp, url_prefix='/api/stats')
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
+        app.register_blueprint(settings_bp, url_prefix='/api/settings')
 
     from cli import register_cli
     register_cli(app)

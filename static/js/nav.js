@@ -86,7 +86,7 @@ const ShuttleNav = {
         return this.MATCH_TYPES[type] || type;
     },
 
-    renderMatchCard(match, showPlayers = true) {
+    renderMatchCard(match, showPlayers = true, options = {}) {
         const typeLabel = this.getMatchTypeLabel(match.type);
         const scores = match.scores || [];
         const scoreStr = scores.map(s => `${s.team1_score}:${s.team2_score}`).join(' / ');
@@ -103,6 +103,16 @@ const ShuttleNav = {
             }
         }
 
+        let actionsHtml = '';
+        if (options.showActions) {
+            actionsHtml = `
+                <div class="match-card-actions">
+                    <span class="match-action-btn match-action-edit" onclick="ShuttleMatches.openEditModal(${match.id})" title="编辑">&#9998;</span>
+                    <span class="match-action-btn match-action-delete" onclick="ShuttleMatches.confirmDelete(${match.id})" title="删除">&#10005;</span>
+                </div>
+            `;
+        }
+
         return `
             <div class="match-card">
                 <div class="match-card-header">
@@ -111,6 +121,7 @@ const ShuttleNav = {
                 </div>
                 <div class="match-card-score">${scoreStr || '-'}</div>
                 ${playersHtml}
+                ${actionsHtml}
             </div>
         `;
     }

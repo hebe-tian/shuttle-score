@@ -116,6 +116,18 @@ const ShuttleAPI = {
         },
         random() {
             return ShuttleAPI.get('/api/matches/random');
+        },
+        update(data) {
+            return ShuttleAPI.post('/api/matches/update', data);
+        },
+        delete(matchId) {
+            return ShuttleAPI.post('/api/matches/delete', { match_id: matchId });
+        }
+    },
+
+    settings: {
+        get() {
+            return ShuttleAPI.get('/api/settings');
         }
     },
 
@@ -167,6 +179,12 @@ const ShuttleAPI = {
         },
         deletePlayer(player_id) {
             return ShuttleAPI.post('/api/admin/players/delete', { player_id }, { admin: true });
+        },
+        getSettings() {
+            return ShuttleAPI.get('/api/admin/settings', true);
+        },
+        updateSettings(items) {
+            return ShuttleAPI.post('/api/admin/settings/update', { items }, { admin: true });
         }
     }
 };

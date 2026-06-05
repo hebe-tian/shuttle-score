@@ -189,6 +189,133 @@ def get_match(match_id):
     return success(match.to_dict(include_details=True))
 
 
+@matches_bp.route('/update', methods=['POST'])
+@token_required
+def update_match():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+
+    match_id = data.get('match_id')
+    if not match_id:
+        return bad_request("比赛ID不能为空")
+
+    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
+    if not match:
+        return not_found("比赛记录不存在")
+
+    match_type = data.get('type', '')
+    ok, msg = validate_match_type(match_type)
+    if not ok:
+        return bad_request(msg)
+
+    player_ids = data.get('player_ids', [])
+    scores_data = data.get('scores', [])
+
+    category = MATCH_TYPE_CATEGORY[match_type]
+    gender_req = MATCH_TYPE_GENDER[match_type]
+
+    expected_count = 2 if category == 'singles' else 4
+    if len(player_ids) != expected_count:
+        return bad_request(f"{match_type}需要{expected_count}名选手")
+
+    players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+    if len(players) != len(player_ids):
+        return bad_request("选手不存在或不属于当前用户")
+
+    player_map = {p.id: p for p in players}
+
+    if len(set(player_ids)) != len(player_ids):
+        return bad_request("同一比赛中选手不可重复选择")
+
+    if gender_req:
+        for pid in player_ids:
+            if player_map[pid].gender != gender_req:
+                return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+
+    if match_type == 'xd':
+        team1_ids = player_ids[:2]
+        team2_ids = player_ids[2:]
+        team1_genders = [player_map[pid].gender for pid in team1_ids]
+        team2_genders = [player_map[pid].gender for pid in team2_ids]
+        if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
+            return bad_request("混双每队必须为一男一女组合")
+
+    if not scores_data:
+        return bad_request("比分数据不能为空")
+
+    for s in scores_data:
+        ok1, msg1 = validate_score(s.get('team1_score', -1))
+        if not ok1:
+            return bad_request(f"队伍1得分错误: {msg1}")
+        ok2, msg2 = validate_score(s.get('team2_score', -1))
+        if not ok2:
+            return bad_request(f"队伍2得分错误: {msg2}")
+
+    # 删除旧的选手和比分记录
+    MatchPlayer.query.filter_by(match_id=match.id).delete()
+    MatchScore.query.filter_by(match_id=match.id).delete()
+
+    # 更新比赛类型（match_time 保持不变）
+    match.type = match_type
+
+    # 重新创建选手记录
+    team_size = 1 if category == 'singles' else 2
+    for i, pid in enumerate(player_ids):
+        team = 1 if i < team_size else 2
+        mp = MatchPlayer(
+            match_id=match.id,
+            player_id=pid,
+            team=team,
+            is_winner=0
+        )
+        db.session.add(mp)
+
+    # 重新创建比分记录并计算胜负
+    for idx, s in enumerate(scores_data):
+        t1_score = s['team1_score']
+        t2_score = s['team2_score']
+        winner_team = 0
+        if t1_score > t2_score:
+            winner_team = 1
+        elif t2_score > t1_score:
+            winner_team = 2
+
+        if winner_team > 0:
+            MatchPlayer.query.filter_by(match_id=match.id, team=winner_team).update({'is_winner': 1})
+
+        score = MatchScore(
+            match_id=match.id,
+            game_number=idx + 1,
+            team1_score=t1_score,
+            team2_score=t2_score
+        )
+        db.session.add(score)
+
+    db.session.commit()
+
+    return success(match.to_dict(include_details=True))
+
+
+@matches_bp.route('/delete', methods=['POST'])
+@token_required
+def delete_match():
+    user = request.current_user
+    data = request.get_json(silent=True) or {}
+
+    match_id = data.get('match_id')
+    if not match_id:
+        return bad_request("比赛ID不能为空")
+
+    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
+    if not match:
+        return not_found("比赛记录不存在")
+
+    match.deleted = 1
+    db.session.commit()
+
+    return success({"message": "比赛记录已删除"})
+
+
 @matches_bp.route('/random', methods=['GET'])
 def random_matches():
     total = Match.query.filter_by(deleted=0).count()
