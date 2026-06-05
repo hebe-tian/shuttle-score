@@ -41,6 +41,14 @@
 
     <div id="tab-bar" class="tab-bar"></div>
 
+    <footer id="site-footer" class="site-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">Shuttle Score</div>
+            <div class="footer-contact" id="footer-contact"></div>
+            <div class="footer-copy">&copy; 2026 Shuttle Score</div>
+        </div>
+    </footer>
+
     <script src="/js/auth.js"></script>
     <script src="/js/api.js"></script>
     <script src="/js/nav.js"></script>
@@ -68,6 +76,29 @@
         }
 
         loadRandomMatches();
+
+        async function loadFooterSettings() {
+            const res = await ShuttleAPI.settings.get();
+            if (!res.ok) return;
+
+            const data = res.data || {};
+            const container = document.getElementById('footer-contact');
+            if (!container) return;
+
+            let links = [];
+            if (data.github_issue_url) {
+                links.push(`<a href="${data.github_issue_url}" target="_blank" rel="noopener" class="footer-link">GitHub Issues</a>`);
+            }
+            if (data.contact_email) {
+                links.push(`<a href="mailto:${data.contact_email}" class="footer-link">${data.contact_email}</a>`);
+            }
+
+            if (links.length > 0) {
+                container.innerHTML = '<span class="footer-label">反馈或建议:</span>' + links.join('<span class="footer-sep">|</span>');
+            }
+        }
+
+        loadFooterSettings();
     </script>
 </body>
 </html>

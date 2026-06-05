@@ -316,5 +316,40 @@ const ShuttleAdmin = {
 
     adminLogout() {
         ShuttleAuth.adminLogout();
+    },
+
+    async loadSettings() {
+        const res = await ShuttleAPI.admin.getSettings();
+        if (!res.ok) {
+            ShuttleNav.showToast(res.msg || '加载设置失败', 'error');
+            return;
+        }
+
+        const settings = res.data || [];
+        const map = {};
+        settings.forEach(s => { map[s.key] = s.value; });
+
+        const githubInput = document.getElementById('setting-github-url');
+        const emailInput = document.getElementById('setting-contact-email');
+
+        if (githubInput) githubInput.value = map['github_issue_url'] || '';
+        if (emailInput) emailInput.value = map['contact_email'] || '';
+    },
+
+    async saveSettings() {
+        const githubUrl = document.getElementById('setting-github-url')?.value.trim() || '';
+        const contactEmail = document.getElementById('setting-contact-email')?.value.trim() || '';
+
+        const items = [
+            { key: 'github_issue_url', value: githubUrl },
+            { key: 'contact_email', value: contactEmail }
+        ];
+
+        const res = await ShuttleAPI.admin.updateSettings(items);
+        if (res.ok) {
+            ShuttleNav.showToast('设置已保存');
+        } else {
+            ShuttleNav.showToast(res.msg || '保存失败', 'error');
+        }
     }
 };

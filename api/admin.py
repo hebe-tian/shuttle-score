@@ -3,6 +3,7 @@ from extensions import db
 from models.user import User, Admin
 from models.match import Match, MatchPlayer, MatchScore
 from models.player import Player
+from models.setting import Setting
 from utils.response import success, bad_request, conflict, not_found, forbidden
 from utils.validators import validate_account, validate_password, validate_page, validate_page_size, VALID_MATCH_TYPES
 from utils.auth_decorator import admin_token_required, super_admin_required
@@ -333,3 +334,40 @@ def admin_delete_player():
     db.session.commit()
 
     return success({"message": "选手已删除"})
+
+
+@admin_bp.route('/settings', methods=['GET'])
+@admin_token_required
+def get_settings():
+    settings = Setting.query.all()
+    return success([s.to_dict() for s in settings])
+
+
+@admin_bp.route('/settings/update', methods=['POST'])
+@admin_token_required
+def update_settings():
+    data = request.get_json(silent=True) or {}
+    items = data.get('items', [])
+
+    if not items:
+        return bad_request("设置项不能为空")
+
+    now = int(time.time())
+    for item in items:
+        key = item.get('key', '').strip()
+        value = item.get('value', '')
+        if not key:
+            continue
+
+        setting = Setting.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+            setting.updated_at = now
+        else:
+            setting = Setting(key=key, value=value, updated_at=now)
+            db.session.add(setting)
+
+    db.session.commit()
+
+    settings = Setting.query.all()
+    return success([s.to_dict() for s in settings])
