@@ -48,7 +48,7 @@
         const loginReason = sessionStorage.getItem('login_reason');
         if (loginReason) {
             document.getElementById('login-error').textContent = loginReason;
-            document.getElementById('login-error').style.color = 'var(--primary-darker)';
+            document.getElementById('login-error').style.color = 'var(--primary)';
             sessionStorage.removeItem('login_reason');
         }
 

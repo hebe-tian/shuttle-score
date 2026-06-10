@@ -182,7 +182,7 @@ const ShuttleStats = {
 
         const labels = data.map(d => d.player_name);
         const colors = data.map((_, i) => {
-            const palette = ['#52b788', '#74c69d', '#95d5b2', '#40916c', '#2d6a4f', '#b7e4c7', '#1b4332'];
+            const palette = ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8', '#bfdbfe', '#1e3a5f'];
             return palette[i % palette.length];
         });
 

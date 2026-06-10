@@ -107,13 +107,13 @@ const ShuttleMatches = {
             const team2Names = isDoubles
                 ? [playerMap[this.selectedPlayers[2]]?.name, playerMap[this.selectedPlayers[3]]?.name].filter(Boolean).join(' & ')
                 : playerMap[this.selectedPlayers[1]]?.name || '';
-            items.push(`<span style="font-size:13px;color:var(--primary-darker);">${team1Names} vs ${team2Names}</span>`);
+            items.push(`<span style="font-size:13px;color:var(--text-secondary);">${team1Names} vs ${team2Names}</span>`);
         }
 
         // 步骤3：比分
         if (this.step >= 4 && this.scores.length > 0) {
             const scoreStr = this.scores.map(s => `${s.team1_score}:${s.team2_score}`).join(' / ');
-            items.push(`<span style="font-family:var(--font-score);font-size:14px;color:var(--primary-darker);">${scoreStr}</span>`);
+            items.push(`<span style="font-family:var(--font-score);font-size:14px;color:var(--text-primary);">${scoreStr}</span>`);
         }
 
         if (items.length > 0) {
@@ -401,7 +401,7 @@ const ShuttleMatches = {
                 <div style="text-align:center;margin-bottom:12px;">
                     <div style="font-size:16px;font-weight:bold;color:var(--primary-darkest);">${team1Names} vs ${team2Names}</div>
                 </div>
-                <div style="text-align:center;font-family:var(--font-score);color:var(--primary-darker);">
+                <div style="text-align:center;font-family:var(--font-score);color:var(--text-primary);">
                     ${scoreStr}
                 </div>
                 ${this.scores.length > 1 ? '<div style="text-align:center;font-size:12px;color:var(--text-muted);margin-top:8px;">每局比分将作为独立比赛记录保存</div>' : ''}
