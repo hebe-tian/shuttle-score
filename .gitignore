@@ -15,10 +15,12 @@ test_data.md
 .vscode/
 .idea/
 .trae/
+.agents/
 
 # AI 工具目录
 .superpowers/
 agent.md
+skills-lock.json
 
 # 开发过程日志与报告
 docs/

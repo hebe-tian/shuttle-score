@@ -13,11 +13,12 @@
 
 .admin-sidebar-brand {
     font-family: var(--font-title);
-    font-weight: bold;
+    font-weight: 700;
     font-size: 16px;
-    color: var(--primary-darker);
+    color: var(--primary);
     padding: 0 20px 20px;
     border-bottom: 1px solid var(--border);
+    letter-spacing: -0.01em;
 }
 
 .admin-nav-item {
@@ -26,38 +27,41 @@
     color: var(--text-secondary);
     font-size: 14px;
     text-decoration: none;
-    transition: all 0.2s;
+    transition: all 0.15s;
+    font-weight: 500;
 }
 
 .admin-nav-item:hover {
-    background: var(--page-bg);
-    color: var(--primary-darker);
+    background: var(--primary-bg);
+    color: var(--primary);
 }
 
 .admin-nav-item.active {
     background: var(--primary-bg);
-    color: var(--primary-dark);
+    color: var(--primary);
     font-weight: 600;
     border-right: 3px solid var(--primary);
 }
 
 .admin-content {
     flex: 1;
-    padding: 24px;
+    padding: 28px;
     overflow-x: auto;
+    background: var(--page-bg);
 }
 
 .admin-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
 .admin-title {
-    font-size: 20px;
-    font-weight: bold;
-    color: var(--primary-darker);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
 }
 
 @media (max-width: 767px) {

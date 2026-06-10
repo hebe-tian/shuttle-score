@@ -1,34 +1,35 @@
 :root {
-    --primary: #52b788;
-    --primary-dark: #40916c;
-    --primary-darker: #2d6a4f;
-    --primary-darkest: #1b4332;
-    --primary-light: #74c69d;
-    --primary-lighter: #95d5b2;
-    --primary-lightest: #b7e4c7;
-    --primary-bg: #d8f3dc;
-    --page-bg: #f0f7f0;
+    --primary: #3b82f6;
+    --primary-dark: #2563eb;
+    --primary-darker: #1d4ed8;
+    --primary-darkest: #1e3a5f;
+    --primary-light: #60a5fa;
+    --primary-lighter: #93c5fd;
+    --primary-lightest: #bfdbfe;
+    --primary-bg: #eff6ff;
+    --page-bg: #f5f6f8;
     --white: #ffffff;
-    --error: #e63946;
+    --error: #ef4444;
     --warning: #f59e0b;
-    --text-primary: #1b4332;
-    --text-secondary: #666666;
-    --text-muted: #999999;
-    --border: #c8e6d0;
-    --border-focus: #52b788;
+    --success: #10b981;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --text-muted: #9ca3af;
+    --border: #e5e7eb;
+    --border-focus: #3b82f6;
     --gender-male: #3b82f6;
     --gender-female: #ec4899;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-    --shadow-md: 0 2px 8px rgba(0,0,0,0.1);
-    --shadow-lg: 0 4px 12px rgba(82,183,136,0.3);
-    --radius-card: 12px;
-    --radius-pill: 24px;
-    --radius-tag: 10px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 12px rgba(59,130,246,0.1);
+    --shadow-lg: 0 8px 24px rgba(59,130,246,0.14);
+    --radius-card: 10px;
+    --radius-pill: 20px;
+    --radius-tag: 8px;
     --radius-input: 8px;
-    --radius-modal: 16px;
-    --font-title: 'Trebuchet MS', sans-serif;
-    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-score: 'Trebuchet MS', monospace;
+    --radius-modal: 10px;
+    --font-title: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-score: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     --match-ms: #3b82f6;
     --match-ws: #ec4899;
     --match-os: #8b5cf6;
@@ -53,13 +54,16 @@ body {
     font-family: var(--font-body);
     background: var(--page-bg);
     color: var(--text-primary);
-    line-height: 1.6;
+    line-height: 1.5;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 a {
     color: var(--primary);
     text-decoration: none;
+    transition: color 0.15s;
 }
 
 a:hover {
