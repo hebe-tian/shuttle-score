@@ -76,6 +76,9 @@ def update_player():
     if player.created_by != user.id:
         return forbidden("无权操作此选手")
 
+    if player.user_id and player.user_id == player.created_by:
+        return forbidden("联动选手不可编辑")
+
     name = data.get('name', '').strip()
     bind_user_id = data.get('user_id')
 
@@ -122,6 +125,30 @@ def update_player():
             player.invite_expires_at = 0
             updated = True
 
+    bind_account = data.get('bind_account')
+    if bind_account is not None:
+        bind_account = bind_account.strip()
+        if bind_account == '':
+            player.user_id = None
+            updated = True
+        else:
+            target_user = User.query.filter_by(account=bind_account, status=1).first()
+            if not target_user:
+                return not_found("该账号不存在或已禁用")
+
+            if target_user.id == user.id:
+                return bad_request("不能绑定自己")
+
+            duplicate = Player.query.filter_by(
+                created_by=user.id, user_id=target_user.id, deleted=0
+            ).first()
+            if duplicate and duplicate.id != player.id:
+                return conflict("已存在与该用户绑定的选手")
+
+            player.user_id = target_user.id
+            player.invite_expires_at = 0
+            updated = True
+
     if updated:
         db.session.commit()
 
@@ -144,6 +171,9 @@ def delete_player():
 
     if player.created_by != user.id:
         return forbidden("无权操作此选手")
+
+    if player.user_id and player.user_id == player.created_by:
+        return forbidden("联动选手不可删除")
 
     player.deleted = 1
     db.session.commit()

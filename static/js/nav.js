@@ -1,7 +1,8 @@
 const ShuttleNav = {
     MATCH_TYPES: {
         ms: '男单', ws: '女单', os: '无限制单打',
-        md: '男双', wd: '女双', xd: '混双', od: '无限制双打'
+        md: '男双', wd: '女双', xd: '混双', od: '无限制双打',
+        fs: '无限制比赛(单打场)', fd: '无限制比赛(双打场)'
     },
 
     renderNavBar(activePage) {

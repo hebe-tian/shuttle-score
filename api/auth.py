@@ -181,6 +181,12 @@ def update_profile():
 
         user.username = username
         user.updated_at = int(time.time())
+
+        # 同步更新联动选手的名称
+        linked_player = Player.query.filter_by(user_id=user.id, created_by=user.id, deleted=0).first()
+        if linked_player:
+            linked_player.name = username
+
         db.session.commit()
         return success(user.to_dict())
 

@@ -17,6 +17,7 @@ def win_rate_stats():
     data = request.get_json(silent=True) or {}
 
     query = Match.query.filter_by(created_by=user.id, deleted=0)
+    query = query.filter(Match.type.notin_(['fs', 'fd']))
 
     match_type = data.get('type')
     if match_type:
@@ -26,6 +27,9 @@ def win_rate_stats():
             query = query.filter(Match.type.in_(['ms', 'ws', 'os']))
         elif match_type == 'doubles':
             query = query.filter(Match.type.in_(['md', 'wd', 'xd', 'od']))
+        elif match_type == 'unlimited':
+            query = Match.query.filter_by(created_by=user.id, deleted=0)
+            query = query.filter(Match.type.in_(['fs', 'fd']))
 
     start_time = data.get('start_time')
     end_time = data.get('end_time')
@@ -90,6 +94,7 @@ def score_stats():
     data = request.get_json(silent=True) or {}
 
     query = Match.query.filter_by(created_by=user.id, deleted=0)
+    query = query.filter(Match.type.notin_(['fs', 'fd']))
 
     match_type = data.get('type')
     if match_type:
@@ -99,6 +104,9 @@ def score_stats():
             query = query.filter(Match.type.in_(['ms', 'ws', 'os']))
         elif match_type == 'doubles':
             query = query.filter(Match.type.in_(['md', 'wd', 'xd', 'od']))
+        elif match_type == 'unlimited':
+            query = Match.query.filter_by(created_by=user.id, deleted=0)
+            query = query.filter(Match.type.in_(['fs', 'fd']))
 
     start_time = data.get('start_time')
     end_time = data.get('end_time')

@@ -12,11 +12,17 @@ const ShuttleStats = {
             { value: 'wd', label: '女双' },
             { value: 'xd', label: '混双' },
             { value: 'od', label: '无限制双打' }
+        ],
+        unlimited: [
+            { value: '', label: '全部' },
+            { value: 'fs', label: '无限制比赛(单打场)' },
+            { value: 'fd', label: '无限制比赛(双打场)' }
         ]
     },
     sections: [
         { id: 'singles', label: '单打统计', type: 'singles', matchType: '', subTab: 'winrate', chart: null },
-        { id: 'doubles', label: '双打统计', type: 'doubles', matchType: '', subTab: 'winrate', chart: null }
+        { id: 'doubles', label: '双打统计', type: 'doubles', matchType: '', subTab: 'winrate', chart: null },
+        { id: 'unlimited', label: '无限制比赛统计', type: 'unlimited', matchType: '', subTab: 'winrate', chart: null }
     ],
     filters: {},
 
