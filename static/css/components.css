@@ -269,6 +269,8 @@
 .tag-wd { background: var(--match-wd); }
 .tag-xd { background: var(--match-xd); }
 .tag-od { background: var(--match-od); }
+.tag-fs { background: #8b5cf6; }
+.tag-fd { background: #7c3aed; }
 
 .tag-green {
     background: var(--primary-bg);

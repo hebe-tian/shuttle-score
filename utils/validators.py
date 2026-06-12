@@ -41,7 +41,7 @@ def validate_gender(gender):
     return True, ""
 
 
-VALID_MATCH_TYPES = ('ms', 'ws', 'os', 'md', 'wd', 'xd', 'od')
+VALID_MATCH_TYPES = ('ms', 'ws', 'os', 'md', 'wd', 'xd', 'od', 'fs', 'fd')
 
 
 def validate_match_type(match_type):
@@ -58,6 +58,8 @@ MATCH_TYPE_GENDER = {
     'wd': 'female',
     'xd': None,
     'od': None,
+    'fs': None,
+    'fd': None,
 }
 
 MATCH_TYPE_CATEGORY = {
@@ -68,6 +70,8 @@ MATCH_TYPE_CATEGORY = {
     'wd': 'doubles',
     'xd': 'doubles',
     'od': 'doubles',
+    'fs': 'singles',
+    'fd': 'doubles',
 }
 
 MATCH_TYPE_LABELS = {
@@ -78,6 +82,8 @@ MATCH_TYPE_LABELS = {
     'wd': '女双',
     'xd': '混双',
     'od': '无限制双打',
+    'fs': '无限制比赛(单打场)',
+    'fd': '无限制比赛(双打场)',
 }
 
 

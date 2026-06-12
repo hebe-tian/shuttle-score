@@ -8,6 +8,8 @@ from utils.validators import (
     MATCH_TYPE_GENDER, MATCH_TYPE_CATEGORY, VALID_MATCH_TYPES
 )
 from utils.auth_decorator import token_required
+
+UNLIMITED_MATCH_TYPES = ('fs', 'fd')
 import time
 import random
 
@@ -25,37 +27,65 @@ def create_match():
     if not ok:
         return bad_request(msg)
 
-    player_ids = data.get('player_ids', [])
     scores_data = data.get('scores', [])
 
-    category = MATCH_TYPE_CATEGORY[match_type]
-    gender_req = MATCH_TYPE_GENDER[match_type]
+    is_unlimited = match_type in UNLIMITED_MATCH_TYPES
 
-    expected_count = 2 if category == 'singles' else 4
-    if len(player_ids) != expected_count:
-        return bad_request(f"{match_type}需要{expected_count}名选手")
+    if is_unlimited:
+        # 无限制比赛：使用 players 格式 [{player_id, team}]
+        players_data = data.get('players', [])
+        if not players_data:
+            return bad_request("选手数据不能为空")
 
-    players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-    if len(players) != len(player_ids):
-        return bad_request("选手不存在或不属于当前用户")
+        team1_count = sum(1 for p in players_data if p.get('team') == 1)
+        team2_count = sum(1 for p in players_data if p.get('team') == 2)
+        if team1_count < 1 or team2_count < 1:
+            return bad_request("每队至少需要1名选手")
 
-    player_map = {p.id: p for p in players}
+        player_ids = [p.get('player_id') for p in players_data]
+        team_map = {p.get('player_id'): p.get('team') for p in players_data}
 
-    if len(set(player_ids)) != len(player_ids):
-        return bad_request("同一比赛中选手不可重复选择")
+        if None in player_ids or None in team_map.values():
+            return bad_request("选手数据格式错误")
 
-    if gender_req:
-        for pid in player_ids:
-            if player_map[pid].gender != gender_req:
-                return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+        if len(set(player_ids)) != len(player_ids):
+            return bad_request("同一比赛中选手不可重复选择")
 
-    if match_type == 'xd':
-        team1_ids = player_ids[:2]
-        team2_ids = player_ids[2:]
-        team1_genders = [player_map[pid].gender for pid in team1_ids]
-        team2_genders = [player_map[pid].gender for pid in team2_ids]
-        if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
-            return bad_request("混双每队必须为一男一女组合")
+        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if len(players) != len(player_ids):
+            return bad_request("选手不存在或不属于当前用户")
+    else:
+        # 常规比赛：使用 player_ids 格式
+        player_ids = data.get('player_ids', [])
+
+        category = MATCH_TYPE_CATEGORY[match_type]
+        gender_req = MATCH_TYPE_GENDER[match_type]
+
+        expected_count = 2 if category == 'singles' else 4
+        if len(player_ids) != expected_count:
+            return bad_request(f"{match_type}需要{expected_count}名选手")
+
+        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if len(players) != len(player_ids):
+            return bad_request("选手不存在或不属于当前用户")
+
+        player_map = {p.id: p for p in players}
+
+        if len(set(player_ids)) != len(player_ids):
+            return bad_request("同一比赛中选手不可重复选择")
+
+        if gender_req:
+            for pid in player_ids:
+                if player_map[pid].gender != gender_req:
+                    return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+
+        if match_type == 'xd':
+            team1_ids = player_ids[:2]
+            team2_ids = player_ids[2:]
+            team1_genders = [player_map[pid].gender for pid in team1_ids]
+            team2_genders = [player_map[pid].gender for pid in team2_ids]
+            if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
+                return bad_request("混双每队必须为一男一女组合")
 
     if not scores_data:
         return bad_request("比分数据不能为空")
@@ -81,16 +111,27 @@ def create_match():
         db.session.add(match)
         db.session.flush()
 
-        team_size = 1 if category == 'singles' else 2
-        for i, pid in enumerate(player_ids):
-            team = 1 if i < team_size else 2
-            mp = MatchPlayer(
-                match_id=match.id,
-                player_id=pid,
-                team=team,
-                is_winner=0
-            )
-            db.session.add(mp)
+        if is_unlimited:
+            for pid in player_ids:
+                mp = MatchPlayer(
+                    match_id=match.id,
+                    player_id=pid,
+                    team=team_map[pid],
+                    is_winner=0
+                )
+                db.session.add(mp)
+        else:
+            category = MATCH_TYPE_CATEGORY[match_type]
+            team_size = 1 if category == 'singles' else 2
+            for i, pid in enumerate(player_ids):
+                team = 1 if i < team_size else 2
+                mp = MatchPlayer(
+                    match_id=match.id,
+                    player_id=pid,
+                    team=team,
+                    is_winner=0
+                )
+                db.session.add(mp)
 
         t1_score = s['team1_score']
         t2_score = s['team2_score']
@@ -153,6 +194,8 @@ def query_matches():
             query = query.filter(Match.type.in_(['ms', 'ws', 'os']))
         elif match_type == 'doubles':
             query = query.filter(Match.type.in_(['md', 'wd', 'xd', 'od']))
+        elif match_type == 'unlimited':
+            query = query.filter(Match.type.in_(['fs', 'fd']))
 
     member_name = data.get('member_name', '').strip()
     if member_name:
@@ -203,42 +246,67 @@ def update_match():
     if not match:
         return not_found("比赛记录不存在")
 
-    match_type = data.get('type', '')
-    ok, msg = validate_match_type(match_type)
-    if not ok:
-        return bad_request(msg)
+    # 比赛类型不可更改，使用原始类型
+    match_type = match.type
+    is_unlimited = match_type in UNLIMITED_MATCH_TYPES
 
-    player_ids = data.get('player_ids', [])
     scores_data = data.get('scores', [])
 
-    category = MATCH_TYPE_CATEGORY[match_type]
-    gender_req = MATCH_TYPE_GENDER[match_type]
+    if is_unlimited:
+        # 无限制比赛：使用 players 格式
+        players_data = data.get('players', [])
+        if not players_data:
+            return bad_request("选手数据不能为空")
 
-    expected_count = 2 if category == 'singles' else 4
-    if len(player_ids) != expected_count:
-        return bad_request(f"{match_type}需要{expected_count}名选手")
+        team1_count = sum(1 for p in players_data if p.get('team') == 1)
+        team2_count = sum(1 for p in players_data if p.get('team') == 2)
+        if team1_count < 1 or team2_count < 1:
+            return bad_request("每队至少需要1名选手")
 
-    players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-    if len(players) != len(player_ids):
-        return bad_request("选手不存在或不属于当前用户")
+        player_ids = [p.get('player_id') for p in players_data]
+        team_map = {p.get('player_id'): p.get('team') for p in players_data}
 
-    player_map = {p.id: p for p in players}
+        if None in player_ids or None in team_map.values():
+            return bad_request("选手数据格式错误")
 
-    if len(set(player_ids)) != len(player_ids):
-        return bad_request("同一比赛中选手不可重复选择")
+        if len(set(player_ids)) != len(player_ids):
+            return bad_request("同一比赛中选手不可重复选择")
 
-    if gender_req:
-        for pid in player_ids:
-            if player_map[pid].gender != gender_req:
-                return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if len(players) != len(player_ids):
+            return bad_request("选手不存在或不属于当前用户")
+    else:
+        # 常规比赛：使用 player_ids 格式
+        player_ids = data.get('player_ids', [])
 
-    if match_type == 'xd':
-        team1_ids = player_ids[:2]
-        team2_ids = player_ids[2:]
-        team1_genders = [player_map[pid].gender for pid in team1_ids]
-        team2_genders = [player_map[pid].gender for pid in team2_ids]
-        if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
-            return bad_request("混双每队必须为一男一女组合")
+        category = MATCH_TYPE_CATEGORY[match_type]
+        gender_req = MATCH_TYPE_GENDER[match_type]
+
+        expected_count = 2 if category == 'singles' else 4
+        if len(player_ids) != expected_count:
+            return bad_request(f"{match_type}需要{expected_count}名选手")
+
+        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if len(players) != len(player_ids):
+            return bad_request("选手不存在或不属于当前用户")
+
+        player_map = {p.id: p for p in players}
+
+        if len(set(player_ids)) != len(player_ids):
+            return bad_request("同一比赛中选手不可重复选择")
+
+        if gender_req:
+            for pid in player_ids:
+                if player_map[pid].gender != gender_req:
+                    return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+
+        if match_type == 'xd':
+            team1_ids = player_ids[:2]
+            team2_ids = player_ids[2:]
+            team1_genders = [player_map[pid].gender for pid in team1_ids]
+            team2_genders = [player_map[pid].gender for pid in team2_ids]
+            if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
+                return bad_request("混双每队必须为一男一女组合")
 
     if not scores_data:
         return bad_request("比分数据不能为空")
@@ -255,20 +323,28 @@ def update_match():
     MatchPlayer.query.filter_by(match_id=match.id).delete()
     MatchScore.query.filter_by(match_id=match.id).delete()
 
-    # 更新比赛类型（match_time 保持不变）
-    match.type = match_type
-
     # 重新创建选手记录
-    team_size = 1 if category == 'singles' else 2
-    for i, pid in enumerate(player_ids):
-        team = 1 if i < team_size else 2
-        mp = MatchPlayer(
-            match_id=match.id,
-            player_id=pid,
-            team=team,
-            is_winner=0
-        )
-        db.session.add(mp)
+    if is_unlimited:
+        for pid in player_ids:
+            mp = MatchPlayer(
+                match_id=match.id,
+                player_id=pid,
+                team=team_map[pid],
+                is_winner=0
+            )
+            db.session.add(mp)
+    else:
+        category = MATCH_TYPE_CATEGORY[match_type]
+        team_size = 1 if category == 'singles' else 2
+        for i, pid in enumerate(player_ids):
+            team = 1 if i < team_size else 2
+            mp = MatchPlayer(
+                match_id=match.id,
+                player_id=pid,
+                team=team,
+                is_winner=0
+            )
+            db.session.add(mp)
 
     # 重新创建比分记录并计算胜负
     for idx, s in enumerate(scores_data):

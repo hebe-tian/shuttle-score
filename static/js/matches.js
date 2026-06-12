@@ -6,7 +6,9 @@ const ShuttleMatches = {
         md: { label: '男双', category: 'doubles', gender: 'male' },
         wd: { label: '女双', category: 'doubles', gender: 'female' },
         xd: { label: '混双', category: 'doubles', gender: null },
-        od: { label: '无限制双打', category: 'doubles', gender: null }
+        od: { label: '无限制双打', category: 'doubles', gender: null },
+        fs: { label: '无限制比赛(单打场)', category: 'singles', gender: null },
+        fd: { label: '无限制比赛(双打场)', category: 'doubles', gender: null }
     },
 
     step: 1,
@@ -14,6 +16,13 @@ const ShuttleMatches = {
     selectedPlayers: [],
     scores: [{ team1_score: 0, team2_score: 0 }],
     allPlayers: [],
+
+    // 无限制比赛的动态选手列表：{ team1: [id, ...], team2: [id, ...] }
+    unlimitedPlayers: { team1: [], team2: [] },
+
+    isUnlimitedType(type) {
+        return type === 'fs' || type === 'fd';
+    },
 
     async initRecord() {
         await this.loadPlayers();
@@ -39,6 +48,8 @@ const ShuttleMatches = {
                 document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
                 el.classList.add('selected');
                 this.matchType = el.dataset.type;
+                // 切换类型时重置无限制选手
+                this.unlimitedPlayers = { team1: [], team2: [] };
             });
         });
 
@@ -89,14 +100,20 @@ const ShuttleMatches = {
 
         let items = [];
 
-        // 步骤1：比赛类型
         if (this.matchType) {
             const info = this.MATCH_TYPES[this.matchType];
             items.push(`<span class="tag tag-${this.matchType}">${info.label}</span>`);
         }
 
-        // 步骤2：选手
-        if (this.step >= 3 && this.selectedPlayers.length > 0) {
+        if (this.step >= 3 && this.isUnlimitedType(this.matchType)) {
+            const playerMap = {};
+            this.allPlayers.forEach(p => playerMap[p.id] = p);
+            const team1Names = this.unlimitedPlayers.team1.map(id => playerMap[id]?.name).filter(Boolean).join(' & ');
+            const team2Names = this.unlimitedPlayers.team2.map(id => playerMap[id]?.name).filter(Boolean).join(' & ');
+            if (team1Names || team2Names) {
+                items.push(`<span style="font-size:13px;color:var(--text-secondary);">${team1Names} vs ${team2Names}</span>`);
+            }
+        } else if (this.step >= 3 && this.selectedPlayers.length > 0) {
             const playerMap = {};
             this.allPlayers.forEach(p => playerMap[p.id] = p);
             const info = this.MATCH_TYPES[this.matchType];
@@ -110,7 +127,6 @@ const ShuttleMatches = {
             items.push(`<span style="font-size:13px;color:var(--text-secondary);">${team1Names} vs ${team2Names}</span>`);
         }
 
-        // 步骤3：比分
         if (this.step >= 4 && this.scores.length > 0) {
             const scoreStr = this.scores.map(s => `${s.team1_score}:${s.team2_score}`).join(' / ');
             items.push(`<span style="font-family:var(--font-score);font-size:14px;color:var(--text-primary);">${scoreStr}</span>`);
@@ -130,12 +146,20 @@ const ShuttleMatches = {
             return;
         }
         if (this.step === 2) {
-            this.collectPlayerIds();
-            const info = this.MATCH_TYPES[this.matchType];
-            const needed = info.category === 'singles' ? 2 : 4;
-            if (this.selectedPlayers.length !== needed) {
-                ShuttleNav.showToast(`该类型需要${needed}名选手`, 'error');
-                return;
+            if (this.isUnlimitedType(this.matchType)) {
+                this.collectUnlimitedPlayerIds();
+                if (this.unlimitedPlayers.team1.length < 1 || this.unlimitedPlayers.team2.length < 1) {
+                    ShuttleNav.showToast('每队至少需要1名选手', 'error');
+                    return;
+                }
+            } else {
+                this.collectPlayerIds();
+                const info = this.MATCH_TYPES[this.matchType];
+                const needed = info.category === 'singles' ? 2 : 4;
+                if (this.selectedPlayers.length !== needed) {
+                    ShuttleNav.showToast(`该类型需要${needed}名选手`, 'error');
+                    return;
+                }
             }
         }
         if (this.step === 3) {
@@ -166,7 +190,127 @@ const ShuttleMatches = {
         return filtered;
     },
 
+    // ===== 无限制比赛：动态选手选择 =====
+
+    renderUnlimitedPlayerSelection() {
+        const area = document.getElementById('player-select-area');
+        if (!area) return;
+
+        // 重新渲染前，先保存当前 select 的值到 unlimitedPlayers
+        this.collectUnlimitedPlayerIds();
+
+        const allPlayers = this.allPlayers; // 不限制性别
+
+        const renderTeam = (teamKey, label) => {
+            const playerIds = this.unlimitedPlayers[teamKey];
+            let html = `<div><div class="team-label">${label}</div>`;
+            playerIds.forEach((pid, idx) => {
+                html += `<div class="form-group" style="display:flex;gap:6px;align-items:center;">
+                    <select class="form-select unlimited-player-select" data-team="${teamKey}" data-idx="${idx}" style="flex:1;">
+                        <option value="">选择选手</option>
+                    </select>
+                    ${playerIds.length > 1 ? `<button type="button" class="btn btn-sm btn-danger unlimited-remove-btn" data-team="${teamKey}" data-idx="${idx}" style="padding:4px 8px;">✕</button>` : ''}
+                </div>`;
+            });
+            html += `<button type="button" class="btn btn-outline btn-sm unlimited-add-btn" data-team="${teamKey}" style="margin-top:4px;">+ 添加选手</button>`;
+            html += '</div>';
+            return html;
+        };
+
+        area.innerHTML = `<div class="player-select-area">${renderTeam('team1', '队伍1')}${renderTeam('team2', '队伍2')}</div>`;
+
+        // 绑定事件
+        area.querySelectorAll('.unlimited-add-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const team = btn.dataset.team;
+                this.unlimitedPlayers[team].push(null);
+                this.renderUnlimitedPlayerSelection();
+            });
+        });
+
+        area.querySelectorAll('.unlimited-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const team = btn.dataset.team;
+                const idx = parseInt(btn.dataset.idx);
+                this.unlimitedPlayers[team].splice(idx, 1);
+                this.renderUnlimitedPlayerSelection();
+            });
+        });
+
+        this.updateUnlimitedPlayerOptions();
+    },
+
+    updateUnlimitedPlayerOptions() {
+        const allPlayers = this.allPlayers;
+        const selects = document.querySelectorAll('.unlimited-player-select');
+
+        // 优先从 unlimitedPlayers 数据模型读取已选值，DOM 值作为补充
+        const currentValues = {};
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const storedVal = this.unlimitedPlayers[team]?.[idx];
+            // 如果数据模型有值则用数据模型的值，否则用 DOM 的值
+            currentValues[team + '-' + idx] = (storedVal != null && storedVal !== undefined)
+                ? String(storedVal)
+                : sel.value;
+        });
+
+        // 收集所有已选的playerId（排除当前select自身）
+        const getSelectedIds = (excludeTeam, excludeIdx) => {
+            const ids = [];
+            selects.forEach(sel => {
+                const key = sel.dataset.team + '-' + sel.dataset.idx;
+                if (sel.dataset.team === excludeTeam && parseInt(sel.dataset.idx) === excludeIdx) return;
+                const val = currentValues[key];
+                if (val) ids.push(parseInt(val));
+            });
+            return ids;
+        };
+
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const currentValue = currentValues[team + '-' + idx] || '';
+            const otherSelectedIds = getSelectedIds(team, idx);
+
+            let availablePlayers = allPlayers.filter(p => !otherSelectedIds.includes(p.id));
+
+            let optionsHtml = '<option value="">选择选手</option>';
+            availablePlayers.forEach(p => {
+                const selected = String(p.id) === currentValue ? ' selected' : '';
+                optionsHtml += `<option value="${p.id}"${selected}>${p.name} (${p.gender === 'male' ? '男' : '女'})</option>`;
+            });
+
+            sel.innerHTML = optionsHtml;
+
+            sel.addEventListener('change', () => this.updateUnlimitedPlayerOptions());
+        });
+    },
+
+    collectUnlimitedPlayerIds() {
+        // 按索引更新已有值，保留 null 占位符，不清空数组
+        const selects = document.querySelectorAll('.unlimited-player-select');
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const val = parseInt(sel.value);
+            if (team === 'team1' && idx < this.unlimitedPlayers.team1.length) {
+                this.unlimitedPlayers.team1[idx] = val || null;
+            } else if (team === 'team2' && idx < this.unlimitedPlayers.team2.length) {
+                this.unlimitedPlayers.team2[idx] = val || null;
+            }
+        });
+    },
+
+    // ===== 常规比赛：选手选择 =====
+
     renderPlayerSelection() {
+        if (this.isUnlimitedType(this.matchType)) {
+            this.renderUnlimitedPlayerSelection();
+            return;
+        }
+
         const info = this.MATCH_TYPES[this.matchType];
         const isDoubles = info.category === 'doubles';
         const isXd = this.matchType === 'xd';
@@ -331,7 +475,11 @@ const ShuttleMatches = {
     },
 
     renderScoreInput() {
-        this.collectPlayerIds();
+        if (this.isUnlimitedType(this.matchType)) {
+            this.collectUnlimitedPlayerIds();
+        } else {
+            this.collectPlayerIds();
+        }
 
         const container = document.getElementById('score-input-area');
         if (!container) return;
@@ -375,7 +523,11 @@ const ShuttleMatches = {
     },
 
     renderConfirm() {
-        this.collectPlayerIds();
+        if (this.isUnlimitedType(this.matchType)) {
+            this.collectUnlimitedPlayerIds();
+        } else {
+            this.collectPlayerIds();
+        }
         const container = document.getElementById('confirm-area');
         if (!container) return;
 
@@ -383,13 +535,19 @@ const ShuttleMatches = {
         const playerMap = {};
         this.allPlayers.forEach(p => playerMap[p.id] = p);
 
-        const isDoubles = info.category === 'doubles';
-        const team1Names = isDoubles
-            ? [playerMap[this.selectedPlayers[0]]?.name, playerMap[this.selectedPlayers[1]]?.name].filter(Boolean).join(' & ')
-            : playerMap[this.selectedPlayers[0]]?.name || '';
-        const team2Names = isDoubles
-            ? [playerMap[this.selectedPlayers[2]]?.name, playerMap[this.selectedPlayers[3]]?.name].filter(Boolean).join(' & ')
-            : playerMap[this.selectedPlayers[1]]?.name || '';
+        let team1Names, team2Names;
+        if (this.isUnlimitedType(this.matchType)) {
+            team1Names = this.unlimitedPlayers.team1.map(id => playerMap[id]?.name).filter(Boolean).join(' & ');
+            team2Names = this.unlimitedPlayers.team2.map(id => playerMap[id]?.name).filter(Boolean).join(' & ');
+        } else {
+            const isDoubles = info.category === 'doubles';
+            team1Names = isDoubles
+                ? [playerMap[this.selectedPlayers[0]]?.name, playerMap[this.selectedPlayers[1]]?.name].filter(Boolean).join(' & ')
+                : playerMap[this.selectedPlayers[0]]?.name || '';
+            team2Names = isDoubles
+                ? [playerMap[this.selectedPlayers[2]]?.name, playerMap[this.selectedPlayers[3]]?.name].filter(Boolean).join(' & ')
+                : playerMap[this.selectedPlayers[1]]?.name || '';
+        }
 
         const scoreStr = this.scores.map((s, i) => `第${i + 1}局: ${s.team1_score} : ${s.team2_score}`).join('<br>');
 
@@ -410,13 +568,29 @@ const ShuttleMatches = {
     },
 
     async submitMatch() {
-        this.collectPlayerIds();
-
-        const data = {
-            type: this.matchType,
-            player_ids: this.selectedPlayers,
-            scores: this.scores
-        };
+        let data;
+        if (this.isUnlimitedType(this.matchType)) {
+            this.collectUnlimitedPlayerIds();
+            const players = [];
+            this.unlimitedPlayers.team1.forEach(pid => {
+                players.push({ player_id: pid, team: 1 });
+            });
+            this.unlimitedPlayers.team2.forEach(pid => {
+                players.push({ player_id: pid, team: 2 });
+            });
+            data = {
+                type: this.matchType,
+                players: players,
+                scores: this.scores
+            };
+        } else {
+            this.collectPlayerIds();
+            data = {
+                type: this.matchType,
+                player_ids: this.selectedPlayers,
+                scores: this.scores
+            };
+        }
 
         const res = await ShuttleAPI.matches.create(data);
         if (res.ok) {
@@ -434,6 +608,7 @@ const ShuttleMatches = {
         this.step = 1;
         this.matchType = '';
         this.selectedPlayers = [];
+        this.unlimitedPlayers = { team1: [], team2: [] };
         this.scores = [{ team1_score: 0, team2_score: 0 }];
         document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
         this.renderStep();
@@ -518,7 +693,8 @@ const ShuttleMatches = {
         this.doQuery();
     },
 
-    // 编辑/删除功能
+    // ===== 编辑/删除功能 =====
+
     editMatchData: null,
 
     async openEditModal(matchId) {
@@ -535,21 +711,28 @@ const ShuttleMatches = {
         const modal = document.getElementById('edit-modal');
         if (!modal) return;
 
-        // 渲染编辑表单
-        const typeOptions = Object.entries(this.MATCH_TYPES).map(([key, val]) =>
-            `<div class="type-option ${match.type === key ? 'selected' : ''}" data-type="${key}" onclick="ShuttleMatches.editSelectType('${key}')">${val.label}</div>`
-        ).join('');
+        const info = this.MATCH_TYPES[match.type];
+        const isUnlimited = this.isUnlimitedType(match.type);
 
+        // 初始化编辑状态
+        this.editScores = (match.scores || []).map(s => ({ team1_score: s.team1_score, team2_score: s.team2_score }));
+        if (this.editScores.length === 0) this.editScores = [{ team1_score: 0, team2_score: 0 }];
+
+        if (isUnlimited) {
+            this.editUnlimitedPlayers = { team1: [], team2: [] };
+            (match.players || []).forEach(p => {
+                if (p.team === 1) this.editUnlimitedPlayers.team1.push(p.player_id);
+                else this.editUnlimitedPlayers.team2.push(p.player_id);
+            });
+        }
+
+        // 编辑弹窗：比赛类型只读展示，不展示比赛时间
         modal.innerHTML = `
             <div class="modal">
                 <div class="modal-title">编辑比赛</div>
                 <div class="form-group">
-                    <label class="form-label">比赛时间（不可修改）</label>
-                    <div style="font-size:14px;color:var(--text-secondary);padding:8px 0;">${ShuttleNav.formatTime(match.match_time)}</div>
-                </div>
-                <div class="form-group">
                     <label class="form-label">比赛类型</label>
-                    <div class="type-grid" id="edit-type-grid">${typeOptions}</div>
+                    <span class="tag tag-${match.type}">${info.label}</span>
                 </div>
                 <div class="form-group">
                     <label class="form-label">选手</label>
@@ -568,34 +751,137 @@ const ShuttleMatches = {
 
         modal.classList.add('active');
 
-        // 初始化编辑状态
-        this.editType = match.type;
-        this.editScores = (match.scores || []).map(s => ({ team1_score: s.team1_score, team2_score: s.team2_score }));
-        if (this.editScores.length === 0) this.editScores = [{ team1_score: 0, team2_score: 0 }];
-
-        this.renderEditPlayers();
+        if (isUnlimited) {
+            this.renderEditUnlimitedPlayers();
+        } else {
+            this.renderEditPlayers();
+        }
         this.renderEditScores();
     },
 
-    editType: '',
     editScores: [],
+    editUnlimitedPlayers: { team1: [], team2: [] },
 
-    editSelectType(type) {
-        this.editType = type;
-        document.querySelectorAll('#edit-type-grid .type-option').forEach(el => {
-            el.classList.toggle('selected', el.dataset.type === type);
+    // ===== 无限制比赛编辑选手 =====
+
+    renderEditUnlimitedPlayers() {
+        const area = document.getElementById('edit-player-area');
+        if (!area) return;
+
+        // 重新渲染前，先保存当前 select 的值
+        this.collectEditUnlimitedPlayerIds();
+
+        const allPlayers = this.allPlayers;
+
+        const renderTeam = (teamKey, label) => {
+            const playerIds = this.editUnlimitedPlayers[teamKey];
+            let html = `<div><div class="team-label">${label}</div>`;
+            playerIds.forEach((pid, idx) => {
+                html += `<div class="form-group" style="display:flex;gap:6px;align-items:center;">
+                    <select class="form-select edit-unlimited-player-select" data-team="${teamKey}" data-idx="${idx}" style="flex:1;">
+                        <option value="">选择选手</option>
+                    </select>
+                    ${playerIds.length > 1 ? `<button type="button" class="btn btn-sm btn-danger edit-unlimited-remove-btn" data-team="${teamKey}" data-idx="${idx}" style="padding:4px 8px;">✕</button>` : ''}
+                </div>`;
+            });
+            html += `<button type="button" class="btn btn-outline btn-sm edit-unlimited-add-btn" data-team="${teamKey}" style="margin-top:4px;">+ 添加选手</button>`;
+            html += '</div>';
+            return html;
+        };
+
+        area.innerHTML = `<div class="player-select-area">${renderTeam('team1', '队伍1')}${renderTeam('team2', '队伍2')}</div>`;
+
+        area.querySelectorAll('.edit-unlimited-add-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const team = btn.dataset.team;
+                this.editUnlimitedPlayers[team].push(null);
+                this.renderEditUnlimitedPlayers();
+            });
         });
-        this.renderEditPlayers();
+
+        area.querySelectorAll('.edit-unlimited-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const team = btn.dataset.team;
+                const idx = parseInt(btn.dataset.idx);
+                this.editUnlimitedPlayers[team].splice(idx, 1);
+                this.renderEditUnlimitedPlayers();
+            });
+        });
+
+        this.updateEditUnlimitedPlayerOptions();
     },
+
+    updateEditUnlimitedPlayerOptions() {
+        const allPlayers = this.allPlayers;
+        const selects = document.querySelectorAll('.edit-unlimited-player-select');
+
+        // 优先从 editUnlimitedPlayers 数据模型读取已选值
+        const currentValues = {};
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const storedVal = this.editUnlimitedPlayers[team]?.[idx];
+            currentValues[team + '-' + idx] = (storedVal != null && storedVal !== undefined)
+                ? String(storedVal)
+                : sel.value;
+        });
+
+        const getSelectedIds = (excludeTeam, excludeIdx) => {
+            const ids = [];
+            selects.forEach(sel => {
+                const key = sel.dataset.team + '-' + sel.dataset.idx;
+                if (sel.dataset.team === excludeTeam && parseInt(sel.dataset.idx) === excludeIdx) return;
+                const val = currentValues[key];
+                if (val) ids.push(parseInt(val));
+            });
+            return ids;
+        };
+
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const currentValue = currentValues[team + '-' + idx] || '';
+            const otherSelectedIds = getSelectedIds(team, idx);
+
+            let availablePlayers = allPlayers.filter(p => !otherSelectedIds.includes(p.id));
+
+            let optionsHtml = '<option value="">选择选手</option>';
+            availablePlayers.forEach(p => {
+                const selected = String(p.id) === currentValue ? ' selected' : '';
+                optionsHtml += `<option value="${p.id}"${selected}>${p.name} (${p.gender === 'male' ? '男' : '女'})</option>`;
+            });
+
+            sel.innerHTML = optionsHtml;
+
+            sel.addEventListener('change', () => this.updateEditUnlimitedPlayerOptions());
+        });
+    },
+
+    collectEditUnlimitedPlayerIds() {
+        // 按索引更新已有值，保留 null 占位符，不清空数组
+        const selects = document.querySelectorAll('.edit-unlimited-player-select');
+        selects.forEach(sel => {
+            const team = sel.dataset.team;
+            const idx = parseInt(sel.dataset.idx);
+            const val = parseInt(sel.value);
+            if (team === 'team1' && idx < this.editUnlimitedPlayers.team1.length) {
+                this.editUnlimitedPlayers.team1[idx] = val || null;
+            } else if (team === 'team2' && idx < this.editUnlimitedPlayers.team2.length) {
+                this.editUnlimitedPlayers.team2[idx] = val || null;
+            }
+        });
+    },
+
+    // ===== 常规比赛编辑选手 =====
 
     renderEditPlayers() {
         const area = document.getElementById('edit-player-area');
         if (!area) return;
 
-        const info = this.MATCH_TYPES[this.editType];
-        const isDoubles = info.category === 'doubles';
-        const isXd = this.editType === 'xd';
         const match = this.editMatchData;
+        const info = this.MATCH_TYPES[match.type];
+        const isDoubles = info.category === 'doubles';
+        const isXd = match.type === 'xd';
 
         const currentPlayers = match.players || [];
         const team1Players = currentPlayers.filter(p => p.team === 1);
@@ -618,14 +904,12 @@ const ShuttleMatches = {
 
         let html = '<div class="player-select-area">';
 
-        // Team 1
         html += '<div><div class="team-label">队伍1</div>';
         html += `<div class="form-group"><select id="edit-t1p1" class="form-select" data-gender="${t1p1Gender || ''}"><option value="">${placeholder(t1p1Gender)}</option></select></div>`;
         if (isDoubles) {
             html += `<div class="form-group"><select id="edit-t1p2" class="form-select" data-gender="${t1p2Gender || ''}"><option value="">${placeholder(t1p2Gender)}</option></select></div>`;
         }
 
-        // Team 2
         html += '</div><div><div class="team-label">队伍2</div>';
         html += `<div class="form-group"><select id="edit-t2p1" class="form-select" data-gender="${t2p1Gender || ''}"><option value="">${placeholder(t2p1Gender)}</option></select></div>`;
         if (isDoubles) {
@@ -635,14 +919,12 @@ const ShuttleMatches = {
 
         area.innerHTML = html;
 
-        // 设置初始值
         const initialValues = {};
         if (team1Players[0]) initialValues['edit-t1p1'] = team1Players[0].player_id;
         if (isDoubles && team1Players[1]) initialValues['edit-t1p2'] = team1Players[1].player_id;
         if (team2Players[0]) initialValues['edit-t2p1'] = team2Players[0].player_id;
         if (isDoubles && team2Players[1]) initialValues['edit-t2p2'] = team2Players[1].player_id;
 
-        // 临时设置值以便 updateEditPlayerOptions 能读取
         selectIds.forEach(id => {
             const sel = document.getElementById(id);
             if (sel && initialValues[id]) sel.value = initialValues[id];
@@ -659,9 +941,10 @@ const ShuttleMatches = {
     },
 
     updateEditPlayerOptions(initialValues) {
-        const info = this.MATCH_TYPES[this.editType];
+        const match = this.editMatchData;
+        const info = this.MATCH_TYPES[match.type];
         const isDoubles = info.category === 'doubles';
-        const isXd = this.editType === 'xd';
+        const isXd = match.type === 'xd';
 
         let filteredPlayers = this.allPlayers;
         if (info.gender) {
@@ -672,14 +955,12 @@ const ShuttleMatches = {
             ? ['edit-t1p1', 'edit-t1p2', 'edit-t2p1', 'edit-t2p2']
             : ['edit-t1p1', 'edit-t2p1'];
 
-        // 读取当前各 select 的值
         const currentValues = {};
         selectIds.forEach(id => {
             const sel = document.getElementById(id);
             if (sel) currentValues[id] = sel.value;
         });
 
-        // 如果是初始化，用 initialValues 覆盖
         if (initialValues) {
             Object.assign(currentValues, initialValues);
         }
@@ -750,7 +1031,8 @@ const ShuttleMatches = {
     },
 
     collectEditPlayerIds() {
-        const info = this.MATCH_TYPES[this.editType];
+        const match = this.editMatchData;
+        const info = this.MATCH_TYPES[match.type];
         const isDoubles = info.category === 'doubles';
         const ids = [];
 
@@ -770,26 +1052,48 @@ const ShuttleMatches = {
     },
 
     async submitEdit() {
-        const playerIds = this.collectEditPlayerIds();
-        const info = this.MATCH_TYPES[this.editType];
-        const needed = info.category === 'singles' ? 2 : 4;
+        const match = this.editMatchData;
+        const isUnlimited = this.isUnlimitedType(match.type);
+        let data;
 
-        if (playerIds.length !== needed) {
-            ShuttleNav.showToast(`该类型需要${needed}名选手`, 'error');
-            return;
+        if (isUnlimited) {
+            this.collectEditUnlimitedPlayerIds();
+            if (this.editUnlimitedPlayers.team1.length < 1 || this.editUnlimitedPlayers.team2.length < 1) {
+                ShuttleNav.showToast('每队至少需要1名选手', 'error');
+                return;
+            }
+            const players = [];
+            this.editUnlimitedPlayers.team1.forEach(pid => {
+                players.push({ player_id: pid, team: 1 });
+            });
+            this.editUnlimitedPlayers.team2.forEach(pid => {
+                players.push({ player_id: pid, team: 2 });
+            });
+            data = {
+                match_id: match.id,
+                players: players,
+                scores: this.editScores
+            };
+        } else {
+            const playerIds = this.collectEditPlayerIds();
+            const info = this.MATCH_TYPES[match.type];
+            const needed = info.category === 'singles' ? 2 : 4;
+
+            if (playerIds.length !== needed) {
+                ShuttleNav.showToast(`该类型需要${needed}名选手`, 'error');
+                return;
+            }
+            data = {
+                match_id: match.id,
+                player_ids: playerIds,
+                scores: this.editScores
+            };
         }
 
         if (this.editScores.some(s => s.team1_score < 0 || s.team2_score < 0)) {
             ShuttleNav.showToast('比分不能为负数', 'error');
             return;
         }
-
-        const data = {
-            match_id: this.editMatchData.id,
-            type: this.editType,
-            player_ids: playerIds,
-            scores: this.editScores
-        };
 
         const res = await ShuttleAPI.matches.update(data);
         if (res.ok) {

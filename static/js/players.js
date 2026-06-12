@@ -26,14 +26,16 @@ const ShuttlePlayers = {
         }
 
         container.innerHTML = players.map(p => {
+            const isLinked = p.user_id && p.user_id === p.created_by;
             const nameHtml = p.user_id
                 ? `<span class="player-name-bound" data-player-id="${p.id}">${p.name}</span>`
                 : `<strong>${p.name}</strong>`;
             const genderTag = `<span style="margin-left:8px;font-size:12px;font-weight:500;padding:2px 8px;border-radius:10px;color:#fff;background:${p.gender === 'male' ? 'var(--gender-male)' : 'var(--gender-female)'};">${p.gender === 'male' ? '男' : '女'}</span>`;
+            const linkedTag = isLinked ? '<span style="margin-left:6px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;color:#fff;background:var(--primary);">我的</span>' : '';
             const bindBtn = !p.user_id
                 ? `<span class="action-link action-link-success" data-action="bind" data-player-id="${p.id}">绑定</span>`
                 : '';
-            const actions = `
+            const actions = isLinked ? '' : `
                 <div class="player-actions">
                     ${bindBtn}
                     <span class="action-link" data-action="edit" data-player-id="${p.id}">编辑</span>
@@ -42,7 +44,7 @@ const ShuttlePlayers = {
             `;
             return `
                 <div class="card" style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>${nameHtml}${genderTag}</div>
+                    <div>${nameHtml}${genderTag}${linkedTag}</div>
                     ${actions}
                 </div>
             `;
@@ -119,14 +121,14 @@ const ShuttlePlayers = {
     async handleBindByUserId() {
         const modal = document.getElementById('bind-player-modal');
         const playerId = parseInt(modal.dataset.playerId);
-        const userId = document.getElementById('bind-user-id-input').value.trim();
+        const account = document.getElementById('bind-user-id-input').value.trim();
 
-        if (!userId) {
-            ShuttleNav.showToast('请输入用户ID', 'error');
+        if (!account) {
+            ShuttleNav.showToast('请输入账号', 'error');
             return;
         }
 
-        const res = await ShuttleAPI.players.update(playerId, { user_id: userId });
+        const res = await ShuttleAPI.players.update(playerId, { bind_account: account });
         if (res.ok) {
             ShuttleNav.showToast('绑定成功');
             this.closeBindModal();
@@ -186,14 +188,14 @@ const ShuttlePlayers = {
         const modal = document.getElementById('edit-player-modal');
         const playerId = parseInt(modal.dataset.playerId);
         const name = document.getElementById('edit-player-name').value.trim();
-        const userId = document.getElementById('edit-player-user-id').value.trim();
+        const account = document.getElementById('edit-player-user-id').value.trim();
         const errorEl = document.getElementById('edit-player-error');
 
         const data = {};
         if (name) data.name = name;
-        if (userId) data.user_id = userId;
+        if (account) data.bind_account = account;
 
-        if (!data.name && !data.user_id) {
+        if (!data.name && !data.bind_account) {
             errorEl.textContent = '请至少修改一项';
             return;
         }
