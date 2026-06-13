@@ -1,4 +1,6 @@
 import re
+import random
+import string
 
 
 def validate_account(account):
@@ -107,3 +109,24 @@ def validate_page_size(page_size):
         return page_size
     except (ValueError, TypeError):
         return 10
+
+
+def validate_team_name(name):
+    if not name or not isinstance(name, str):
+        return False, "Team名称不能为空"
+    name = name.strip()
+    if len(name) < 2 or len(name) > 20:
+        return False, "Team名称长度需为2-20位"
+    return True, ""
+
+
+def validate_invite_code(code):
+    if not code or not isinstance(code, str):
+        return False, "邀请码不能为空"
+    if not re.match(r'^[a-zA-Z0-9]{8}$', code):
+        return False, "邀请码格式错误"
+    return True, ""
+
+
+def generate_invite_code():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
