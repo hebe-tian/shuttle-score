@@ -8,6 +8,7 @@ class Match(db.Model):
     type = db.Column(db.Text, nullable=False)
     match_time = db.Column(db.Integer, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=True)
     deleted = db.Column(db.Integer, default=0, nullable=False)
     created_at = db.Column(db.Integer, nullable=False)
 
@@ -20,6 +21,7 @@ class Match(db.Model):
             "type": self.type,
             "match_time": self.match_time,
             "created_by": self.created_by,
+            "team_id": self.team_id,
             "created_at": self.created_at
         }
         if include_details:
