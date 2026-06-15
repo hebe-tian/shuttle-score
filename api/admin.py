@@ -4,6 +4,7 @@ from models.user import User, Admin
 from models.match import Match, MatchPlayer, MatchScore
 from models.player import Player
 from models.setting import Setting
+from models.team import Team, TeamMember
 from utils.response import success, bad_request, conflict, not_found, forbidden
 from utils.validators import validate_account, validate_password, validate_page, validate_page_size, VALID_MATCH_TYPES
 from utils.auth_decorator import admin_token_required, super_admin_required
@@ -371,3 +372,113 @@ def update_settings():
 
     settings = Setting.query.all()
     return success([s.to_dict() for s in settings])
+
+
+# ===== Team Management =====
+
+@admin_bp.route('/teams', methods=['GET'])
+@admin_token_required
+def admin_get_teams():
+    page = validate_page(request.args.get('page', 1))
+    page_size = validate_page_size(request.args.get('page_size', 20))
+    search = request.args.get('search', '').strip()
+
+    query = Team.query
+    if search:
+        query = query.filter(Team.name.like(f'%{search}%'))
+
+    total = query.count()
+    teams = query.order_by(Team.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+
+    items = []
+    for team in teams:
+        creator = User.query.get(team.creator_id)
+        member_count = TeamMember.query.filter_by(team_id=team.id).count()
+        player_count = Player.query.filter_by(team_id=team.id, deleted=0).count()
+        match_count = Match.query.filter_by(team_id=team.id, deleted=0).count()
+
+        items.append({
+            "id": team.id,
+            "name": team.name,
+            "creator_id": team.creator_id,
+            "creator_username": creator.username if creator else "未知",
+            "member_count": member_count,
+            "player_count": player_count,
+            "match_count": match_count,
+            "invite_code": team.invite_code,
+            "created_at": team.created_at,
+            "deleted": team.deleted
+        })
+
+    return success({
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": items
+    })
+
+
+@admin_bp.route('/teams/<int:team_id>', methods=['GET'])
+@admin_token_required
+def admin_get_team(team_id):
+    team = Team.query.get(team_id)
+    if not team:
+        return not_found("团队不存在")
+
+    creator = User.query.get(team.creator_id)
+
+    members = TeamMember.query.filter_by(team_id=team.id).all()
+    member_list = [{
+        "id": m.id,
+        "user_id": m.user_id,
+        "username": m.user.username if m.user else None,
+        "joined_at": m.joined_at
+    } for m in members]
+
+    players = Player.query.filter_by(team_id=team.id, deleted=0).all()
+    player_list = []
+    for p in players:
+        d = p.to_dict()
+        bound_user = User.query.get(p.user_id) if p.user_id else None
+        d["bound_username"] = bound_user.username if bound_user else None
+        player_list.append(d)
+
+    match_count = Match.query.filter_by(team_id=team.id, deleted=0).count()
+
+    return success({
+        "id": team.id,
+        "name": team.name,
+        "creator_id": team.creator_id,
+        "creator_username": creator.username if creator else "未知",
+        "invite_code": team.invite_code,
+        "created_at": team.created_at,
+        "deleted": team.deleted,
+        "members": member_list,
+        "players": player_list,
+        "match_count": match_count
+    })
+
+
+@admin_bp.route('/teams/delete', methods=['POST'])
+@admin_token_required
+def admin_delete_team():
+    data = request.get_json(silent=True) or {}
+    team_id = data.get('team_id')
+
+    if not team_id:
+        return bad_request("团队ID不能为空")
+
+    team = Team.query.get(team_id)
+    if not team:
+        return not_found("团队不存在")
+
+    if team.deleted == 1:
+        return bad_request("团队已解散")
+
+    team.deleted = 1
+
+    Player.query.filter_by(team_id=team.id, deleted=0).update({'deleted': 1})
+
+    db.session.commit()
+
+    return success({"message": "团队已解散"})

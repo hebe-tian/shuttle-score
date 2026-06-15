@@ -24,7 +24,10 @@
     <nav id="nav-bar" class="nav-bar"></nav>
 
     <div class="container">
-        <h2 style="font-family:var(--font-title);color:var(--text-primary);margin-bottom:16px;letter-spacing:-0.02em;">比赛查询</h2>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h2 style="font-family:var(--font-title);color:var(--text-primary);margin:0;letter-spacing:-0.02em;">比赛查询</h2>
+            <a href="/pages/matches.html" class="btn btn-outline btn-sm">录入比赛</a>
+        </div>
 
         <div class="card">
             <form id="query-form">
@@ -79,7 +82,7 @@
     <script>
         if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
 
-        ShuttleNav.renderAll('query');
+        ShuttleNav.renderAll('matches');
 
         ShuttleMatches.initQuery();
     </script>

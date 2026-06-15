@@ -12,6 +12,7 @@ class Player(db.Model):
     team_id = db.Column(db.Integer, db.ForeignKey('teams.id'), nullable=True)
     deleted = db.Column(db.Integer, default=0, nullable=False)
     invite_expires_at = db.Column(db.Integer, default=0, nullable=False)
+    role = db.Column(db.Text, default='member', nullable=False)
     created_at = db.Column(db.Integer, nullable=False)
 
     def to_dict(self):
@@ -24,5 +25,6 @@ class Player(db.Model):
             "team_id": self.team_id,
             "deleted": self.deleted,
             "invite_expires_at": self.invite_expires_at,
+            "role": self.role,
             "created_at": self.created_at
         }

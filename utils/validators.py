@@ -136,3 +136,40 @@ def validate_invite_code(code):
 
 def generate_invite_code():
     return ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+
+
+def validate_match_gender(match_type, players_genders):
+    """验证比赛选手性别是否符合规则。
+
+    Args:
+        match_type: 比赛类型 (ms/ws/md/wd/xd/os/od/fs/fd)
+        players_genders: 选手性别列表，如 ['male', 'female', 'male', 'female']
+            单打为 [gender1, gender2]，双打为 [team1_p1, team1_p2, team2_p1, team2_p2]
+
+    Returns:
+        (ok, msg): ok=True 表示通过，msg 为错误信息
+    """
+    gender_req = MATCH_TYPE_GENDER.get(match_type)
+    if gender_req is None and match_type != 'xd':
+        # 无性别限制的比赛类型
+        return True, ''
+
+    if match_type == 'xd':
+        # 混双：每队需要1男1女
+        if len(players_genders) != 4:
+            return False, '混双需要4名选手'
+        team1 = players_genders[:2]
+        team2 = players_genders[2:]
+        if sorted(team1) != ['female', 'male']:
+            return False, '队伍1需要1名男选手和1名女选手'
+        if sorted(team2) != ['female', 'male']:
+            return False, '队伍2需要1名男选手和1名女选手'
+        return True, ''
+
+    # 有性别限制的比赛（ms/ws/md/wd）
+    for g in players_genders:
+        if g != gender_req:
+            gender_label = '男' if gender_req == 'male' else '女'
+            return False, f'该比赛类型要求选手性别为{gender_label}'
+
+    return True, ''

@@ -25,6 +25,7 @@ def create_app():
         from api.stats import stats_bp
         from api.admin import admin_bp
         from api.settings import settings_bp
+        from api.teams import teams_bp
 
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(players_bp, url_prefix='/api/players')
@@ -32,6 +33,7 @@ def create_app():
         app.register_blueprint(stats_bp, url_prefix='/api/stats')
         app.register_blueprint(admin_bp, url_prefix='/api/admin')
         app.register_blueprint(settings_bp, url_prefix='/api/settings')
+        app.register_blueprint(teams_bp, url_prefix='/api/teams')
 
     from cli import register_cli
     register_cli(app)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" href="/images/logo.png">
-    <title>系统设置 - Shuttle Score</title>
+    <title>团队详情 - Shuttle Score</title>
     <link rel="stylesheet" href="/css/base.css">
     <link rel="stylesheet" href="/css/components.css">
     <link rel="stylesheet" href="/css/admin.css">
@@ -18,28 +18,27 @@
             <a href="/pages/admin/users.html" class="admin-nav-item">用户管理</a>
             <a href="/pages/admin/matches.html" class="admin-nav-item">比赛管理</a>
             <a href="/pages/admin/players.html" class="admin-nav-item">选手管理</a>
-            <a href="/pages/admin/teams.html" class="admin-nav-item">团队管理</a>
-            <a href="/pages/admin/settings.html" class="admin-nav-item active">系统设置</a>
+            <a href="/pages/admin/teams.html" class="admin-nav-item active">团队管理</a>
+            <a href="/pages/admin/settings.html" class="admin-nav-item">系统设置</a>
             <a href="/pages/admin/login.html" class="admin-nav-item" onclick="ShuttleAuth.adminLogout()" style="color:var(--error);">退出登录</a>
         </aside>
 
         <main class="admin-content">
             <div class="admin-header">
-                <h1 class="admin-title">系统设置</h1>
+                <h1 class="admin-title">团队详情</h1>
+                <a href="/pages/admin/teams.html" class="btn btn-secondary btn-sm">返回列表</a>
             </div>
 
-            <div class="card">
-                <div class="form-group">
-                    <label class="form-label">GitHub Issue 链接</label>
-                    <input type="url" id="setting-github-url" class="form-input" placeholder="https://github.com/your-repo/issues">
-                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">首页联系方式中展示的 GitHub Issue 页面链接</div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">联系邮箱</label>
-                    <input type="email" id="setting-contact-email" class="form-input" placeholder="your-email@example.com">
-                    <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">首页联系方式中展示的邮箱地址</div>
-                </div>
-                <button class="btn btn-primary" onclick="ShuttleAdmin.saveSettings()">保存设置</button>
+            <div id="team-info"></div>
+
+            <h3 style="margin:16px 0 8px;">成员列表</h3>
+            <div id="member-list"></div>
+
+            <h3 style="margin:16px 0 8px;">选手列表</h3>
+            <div id="player-list"></div>
+
+            <div style="margin-top:24px;">
+                <button id="delete-team-btn" class="btn btn-danger" onclick="ShuttleAdmin.confirmDeleteTeam()">解散团队</button>
             </div>
         </main>
     </div>
@@ -51,7 +50,9 @@
     <script>
         if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
 
-        ShuttleAdmin.loadSettings();
+        const params = new URLSearchParams(window.location.search);
+        const teamId = params.get('id');
+        ShuttleAdmin.loadTeamDetail(teamId);
     </script>
 </body>
 </html>

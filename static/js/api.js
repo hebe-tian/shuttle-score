@@ -137,6 +137,47 @@ const ShuttleAPI = {
         },
         score(data) {
             return ShuttleAPI.post('/api/stats/score', data);
+        },
+        opponentWinRate(data) {
+            return ShuttleAPI.post('/api/stats/opponent-win-rate', data);
+        },
+        partnerWinRate(data) {
+            return ShuttleAPI.post('/api/stats/partner-win-rate', data);
+        },
+        teamPlayerWinRate(data) {
+            return ShuttleAPI.post('/api/stats/team-player-win-rate', data);
+        }
+    },
+
+    teams: {
+        list() {
+            return ShuttleAPI.get('/api/teams');
+        },
+        create(name) {
+            return ShuttleAPI.post('/api/teams', { name });
+        },
+        resolve(name, invite_code) {
+            return ShuttleAPI.post('/api/teams/resolve', { name, invite_code });
+        },
+        get(id) {
+            return ShuttleAPI.get('/api/teams/' + id);
+        },
+        join(id, invite_code, action, bind_player_id) {
+            const data = { invite_code, action };
+            if (bind_player_id) data.bind_player_id = bind_player_id;
+            return ShuttleAPI.post('/api/teams/' + id + '/join', data);
+        },
+        leave(id) {
+            return ShuttleAPI.post('/api/teams/' + id + '/leave', {});
+        },
+        refreshInviteCode(id) {
+            return ShuttleAPI.post('/api/teams/' + id + '/invite-code', {});
+        },
+        getPlayers(id) {
+            return ShuttleAPI.get('/api/teams/' + id + '/players');
+        },
+        addPlayer(id, name, gender) {
+            return ShuttleAPI.post('/api/teams/' + id + '/players', { name, gender });
         }
     },
 
@@ -185,6 +226,17 @@ const ShuttleAPI = {
         },
         updateSettings(items) {
             return ShuttleAPI.post('/api/admin/settings/update', { items }, { admin: true });
+        },
+        getTeams(page, page_size, search) {
+            let url = `/api/admin/teams?page=${page}&page_size=${page_size}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            return ShuttleAPI.get(url, true);
+        },
+        getTeam(team_id) {
+            return ShuttleAPI.get(`/api/admin/teams/${team_id}`, true);
+        },
+        deleteTeam(team_id) {
+            return ShuttleAPI.post('/api/admin/teams/delete', { team_id }, { admin: true });
         }
     }
 };

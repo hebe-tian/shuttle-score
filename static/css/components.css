@@ -347,6 +347,15 @@
     transition: border-color 0.15s, box-shadow 0.15s;
 }
 
+.form-select.my-player-select {
+    background: var(--primary-bg);
+    color: var(--primary-darker);
+    font-weight: 600;
+    cursor: default;
+    opacity: 1;
+    -webkit-text-fill-color: var(--primary-darker);
+}
+
 .form-select:focus {
     border-color: var(--border-focus);
     box-shadow: 0 0 0 3px rgba(59,130,246,0.15);

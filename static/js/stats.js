@@ -1,284 +1,194 @@
 const ShuttleStats = {
-    SECTION_TYPES: {
-        singles: [
-            { value: '', label: '全部' },
-            { value: 'ms', label: '男单' },
-            { value: 'ws', label: '女单' },
-            { value: 'os', label: '无限制单打' }
-        ],
-        doubles: [
-            { value: '', label: '全部' },
-            { value: 'md', label: '男双' },
-            { value: 'wd', label: '女双' },
-            { value: 'xd', label: '混双' },
-            { value: 'od', label: '无限制双打' }
-        ],
-        unlimited: [
-            { value: '', label: '全部' },
-            { value: 'fs', label: '无限制比赛(单打场)' },
-            { value: 'fd', label: '无限制比赛(双打场)' }
-        ]
+    opponentChart: null,
+    partnerChart: null,
+
+    opponentFilters: {
+        time_range: '30d',
+        type: 'all',
+        include_unlimited: true
     },
-    sections: [
-        { id: 'singles', label: '单打统计', type: 'singles', matchType: '', subTab: 'winrate', chart: null },
-        { id: 'doubles', label: '双打统计', type: 'doubles', matchType: '', subTab: 'winrate', chart: null },
-        { id: 'unlimited', label: '无限制比赛统计', type: 'unlimited', matchType: '', subTab: 'winrate', chart: null }
-    ],
-    filters: {},
+    partnerFilters: {
+        time_range: '30d',
+        type: 'all',
+        include_unlimited: true
+    },
 
     init() {
-        this.loadOrder();
-        this.renderSections();
-        this.bindDrag();
-        this.loadAllData();
+        this.setupFilters('opponent');
+        this.setupFilters('partner');
+        this.loadOpponentData();
+        this.loadPartnerData();
     },
 
-    loadOrder() {
-        try {
-            const saved = localStorage.getItem('shuttle_stats_order');
-            if (saved) {
-                const order = JSON.parse(saved);
-                this.sections.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-            }
-        } catch (e) {}
-    },
-
-    saveOrder() {
-        const order = this.sections.map(s => s.id);
-        localStorage.setItem('shuttle_stats_order', JSON.stringify(order));
-    },
-
-    renderSections() {
-        const container = document.getElementById('stats-sections');
+    setupFilters(chartName) {
+        const container = document.getElementById(chartName + '-filters');
         if (!container) return;
 
-        container.innerHTML = this.sections.map(s => {
-            const typeChips = this.SECTION_TYPES[s.id].map(t =>
-                `<button class="type-chip ${s.matchType === t.value ? 'active' : ''}" data-section="${s.id}" data-match-type="${t.value}">${t.label}</button>`
-            ).join('');
+        container.querySelectorAll('.filter-group').forEach(group => {
+            const filterType = group.dataset.filter;
+            const buttons = group.querySelectorAll('.stats-tab, .filter-chip');
 
-            return `
-            <div class="stats-section" id="section-${s.id}" draggable="true" data-section-id="${s.id}">
-                <div class="section-header">
-                    <span class="section-title">${s.label}</span>
-                    <span class="drag-handle" title="拖拽排序">::::</span>
-                </div>
-                <div class="type-chips">${typeChips}</div>
-                <div class="sub-tabs">
-                    <button class="sub-tab ${s.subTab === 'winrate' ? 'active' : ''}" data-section="${s.id}" data-tab="winrate">胜率统计</button>
-                    <button class="sub-tab ${s.subTab === 'score' ? 'active' : ''}" data-section="${s.id}" data-tab="score">得分统计</button>
-                </div>
-                <div class="chart-container">
-                    <canvas id="chart-${s.id}"></canvas>
-                </div>
-            </div>
-            `;
-        }).join('');
-
-        container.querySelectorAll('.type-chip').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const sectionId = btn.dataset.section;
-                const matchType = btn.dataset.matchType;
-                const section = this.sections.find(s => s.id === sectionId);
-                if (section) {
-                    section.matchType = matchType;
-                    btn.parentElement.querySelectorAll('.type-chip').forEach(b => b.classList.remove('active'));
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
-                    this.loadSectionData(section);
-                }
-            });
-        });
-
-        container.querySelectorAll('.sub-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const sectionId = btn.dataset.section;
-                const tab = btn.dataset.tab;
-                const section = this.sections.find(s => s.id === sectionId);
-                if (section) {
-                    section.subTab = tab;
-                    btn.parentElement.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    this.loadSectionData(section);
-                }
+                    this.onFilterChange(chartName, filterType, btn.dataset.value);
+                });
             });
         });
     },
 
-    bindDrag() {
-        const container = document.getElementById('stats-sections');
-        if (!container) return;
+    onFilterChange(chartName, filterType, value) {
+        const filters = chartName === 'opponent' ? this.opponentFilters : this.partnerFilters;
 
-        let dragEl = null;
-
-        container.addEventListener('dragstart', (e) => {
-            const section = e.target.closest('.stats-section');
-            if (!section) return;
-            dragEl = section;
-            section.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        });
-
-        container.addEventListener('dragend', (e) => {
-            const section = e.target.closest('.stats-section');
-            if (section) section.classList.remove('dragging');
-            container.querySelectorAll('.stats-section').forEach(s => s.classList.remove('drag-over'));
-            dragEl = null;
-        });
-
-        container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const target = e.target.closest('.stats-section');
-            if (target && target !== dragEl) {
-                container.querySelectorAll('.stats-section').forEach(s => s.classList.remove('drag-over'));
-                target.classList.add('drag-over');
-            }
-        });
-
-        container.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const target = e.target.closest('.stats-section');
-            if (!target || !dragEl || target === dragEl) return;
-
-            const allSections = [...container.querySelectorAll('.stats-section')];
-            const dragIdx = allSections.indexOf(dragEl);
-            const targetIdx = allSections.indexOf(target);
-
-            if (dragIdx < targetIdx) {
-                container.insertBefore(dragEl, target.nextSibling);
-            } else {
-                container.insertBefore(dragEl, target);
-            }
-
-            const newOrder = [...container.querySelectorAll('.stats-section')].map(s => s.dataset.sectionId);
-            this.sections.sort((a, b) => newOrder.indexOf(a.id) - newOrder.indexOf(b.id));
-            this.saveOrder();
-
-            container.querySelectorAll('.stats-section').forEach(s => s.classList.remove('drag-over'));
-        });
-    },
-
-    async loadAllData() {
-        for (const section of this.sections) {
-            await this.loadSectionData(section);
+        if (filterType === 'time') {
+            filters.time_range = value;
+        } else if (filterType === 'type') {
+            filters.type = value;
+        } else if (filterType === 'formal') {
+            filters.include_unlimited = value === 'include_unlimited';
         }
-    },
 
-    async loadSectionData(section) {
-        const typeFilter = section.matchType || section.type;
-        const data = { type: typeFilter, ...this.filters };
-
-        if (section.subTab === 'winrate') {
-            const res = await ShuttleAPI.stats.winRate(data);
-            if (res.ok) this.renderChart(section, res.data || [], 'winrate');
+        if (chartName === 'opponent') {
+            this.loadOpponentData();
         } else {
-            const res = await ShuttleAPI.stats.score(data);
-            if (res.ok) this.renderChart(section, res.data || [], 'score');
+            this.loadPartnerData();
         }
     },
 
-    renderChart(section, data, type) {
-        if (section.chart) {
-            section.chart.destroy();
-            section.chart = null;
+    buildParams(filters) {
+        const params = {
+            team_id: null,
+            time_range: filters.time_range,
+            include_unlimited: filters.include_unlimited
+        };
+        if (filters.type !== 'all') {
+            params.type = filters.type;
+        }
+        return params;
+    },
+
+    async loadOpponentData() {
+        const params = this.buildParams(this.opponentFilters);
+        const res = await ShuttleAPI.stats.opponentWinRate(params);
+        this.renderOpponentChart(res.ok ? (res.data || []) : []);
+    },
+
+    async loadPartnerData() {
+        const params = this.buildParams(this.partnerFilters);
+        const res = await ShuttleAPI.stats.partnerWinRate(params);
+        this.renderPartnerChart(res.ok ? (res.data || []) : []);
+    },
+
+    renderOpponentChart(data) {
+        if (this.opponentChart) {
+            this.opponentChart.destroy();
+            this.opponentChart = null;
         }
 
-        const canvas = document.getElementById(`chart-${section.id}`);
-        if (!canvas) return;
+        const wrapper = document.getElementById('opponent-chart-wrapper');
+        const empty = document.getElementById('opponent-empty');
+        const canvas = document.getElementById('opponent-chart');
 
-        const labels = data.map(d => d.player_name);
-        const colors = data.map((_, i) => {
-            const palette = ['#3b82f6', '#60a5fa', '#93c5fd', '#2563eb', '#1d4ed8', '#bfdbfe', '#1e3a5f'];
-            return palette[i % palette.length];
-        });
-
-        let chartData;
-        if (type === 'winrate') {
-            chartData = {
-                labels,
-                datasets: [{
-                    label: '胜率 (%)',
-                    data: data.map(d => d.win_rate),
-                    backgroundColor: colors,
-                    borderRadius: 6,
-                    minBarLength: 2
-                }]
-            };
-        } else {
-            chartData = {
-                labels,
-                datasets: [
-                    {
-                        label: '总得分',
-                        data: data.map(d => d.total_score),
-                        backgroundColor: colors.map(c => c),
-                        borderRadius: 6,
-                        minBarLength: 2
-                    },
-                    {
-                        label: '场均得分',
-                        data: data.map(d => d.avg_score),
-                        backgroundColor: colors.map(c => c + '88'),
-                        borderRadius: 6,
-                        minBarLength: 2
-                    }
-                ]
-            };
+        if (!data || data.length === 0) {
+            wrapper.style.display = 'none';
+            empty.style.display = 'block';
+            return;
         }
 
-        section.chart = new Chart(canvas, {
+        wrapper.style.display = 'block';
+        empty.style.display = 'none';
+
+        const sorted = [...data].sort((a, b) => b.win_rate - a.win_rate);
+        const height = Math.max(200, sorted.length * 40);
+        wrapper.style.height = height + 'px';
+
+        this.opponentChart = new Chart(canvas, {
             type: 'bar',
-            data: chartData,
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: type === 'score',
-                        position: 'top'
-                    },
-                    tooltip: {
-                        enabled: true,
-                        callbacks: {
-                            title: (items) => {
-                                return items[0]?.label || '';
-                            },
-                            label: (ctx) => {
-                                if (type === 'winrate') {
-                                    return `胜率: ${ctx.raw}%`;
-                                }
-                                return `${ctx.dataset.label}: ${ctx.raw}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: type === 'winrate' ? 100 : undefined,
-                        ticks: {
-                            callback: (v) => type === 'winrate' ? v + '%' : v
-                        }
-                    }
-                }
-            }
+            data: {
+                labels: sorted.map(d => d.opponent_name),
+                datasets: [{
+                    data: sorted.map(d => d.win_rate),
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barThickness: 24
+                }]
+            },
+            options: this.chartOptions(sorted)
         });
     },
 
-    async applyFilters() {
-        this.filters = {};
-        const member = document.getElementById('stats-member')?.value.trim();
-        const startDate = document.getElementById('stats-start')?.value;
-        const endDate = document.getElementById('stats-end')?.value;
+    renderPartnerChart(data) {
+        if (this.partnerChart) {
+            this.partnerChart.destroy();
+            this.partnerChart = null;
+        }
 
-        if (member) this.filters.member_name = member;
-        if (startDate) this.filters.start_time = Math.floor(new Date(startDate).getTime() / 1000);
-        if (endDate) this.filters.end_time = Math.floor(new Date(endDate + 'T23:59:59').getTime() / 1000);
+        const wrapper = document.getElementById('partner-chart-wrapper');
+        const empty = document.getElementById('partner-empty');
+        const canvas = document.getElementById('partner-chart');
 
-        await this.loadAllData();
+        if (!data || data.length === 0) {
+            wrapper.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        wrapper.style.display = 'block';
+        empty.style.display = 'none';
+
+        const sorted = [...data].sort((a, b) => b.win_rate - a.win_rate);
+        const height = Math.max(200, sorted.length * 40);
+        wrapper.style.height = height + 'px';
+
+        this.partnerChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: sorted.map(d => d.partner_name),
+                datasets: [{
+                    data: sorted.map(d => d.win_rate),
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barThickness: 24
+                }]
+            },
+            options: this.chartOptions(sorted)
+        });
+    },
+
+    chartOptions(sorted) {
+        return {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const item = sorted[ctx.dataIndex];
+                            const matchCount = item ? (item.match_count || item.total_matches || 0) : 0;
+                            return `${ctx.raw}% (${matchCount}场)`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    min: 0,
+                    max: 100,
+                    ticks: { callback: v => v + '%' },
+                    grid: { color: 'rgba(0,0,0,0.05)' }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { font: { size: 13 } }
+                }
+            }
+        };
     }
 };
