@@ -13,8 +13,8 @@ const ShuttleNav = {
         if (loggedIn) {
             links = `
                 <a href="/pages/myhomepage.html" class="${activePage === 'home' ? 'active' : ''}">我的</a>
-                <a href="/pages/matches.html" class="${activePage === 'matches' ? 'active' : ''}">录入</a>
-                <a href="/pages/match-query.html" class="${activePage === 'query' ? 'active' : ''}">查询</a>
+                <a href="/pages/match-query.html" class="${activePage === 'matches' ? 'active' : ''}">比赛</a>
+                <a href="/pages/teams.html" class="${activePage === 'teams' ? 'active' : ''}">团队</a>
                 <a href="/pages/stats.html" class="${activePage === 'stats' ? 'active' : ''}">统计</a>
                 <a href="/pages/profile.html" class="nav-btn">${user ? user.username : '我'}</a>
             `;
@@ -34,8 +34,8 @@ const ShuttleNav = {
     renderTabBar(activeTab) {
         const tabs = [
             { id: 'home', label: '我的', href: '/pages/myhomepage.html' },
-            { id: 'matches', label: '录入', href: '/pages/matches.html' },
-            { id: 'query', label: '查询', href: '/pages/match-query.html' },
+            { id: 'matches', label: '比赛', href: '/pages/match-query.html' },
+            { id: 'teams', label: '团队', href: '/pages/teams.html' },
             { id: 'stats', label: '统计', href: '/pages/stats.html' },
             { id: 'me', label: '我', href: '/pages/profile.html' }
         ];

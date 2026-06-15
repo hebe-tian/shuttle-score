@@ -2,9 +2,11 @@ from flask import Blueprint, request
 from extensions import db
 from models.match import Match, MatchPlayer, MatchScore
 from models.player import Player
+from models.team import Team, TeamMember
 from utils.response import success, bad_request, not_found
 from utils.validators import (
     validate_match_type, validate_score, validate_page, validate_page_size,
+    validate_match_gender,
     MATCH_TYPE_GENDER, MATCH_TYPE_CATEGORY, VALID_MATCH_TYPES
 )
 from utils.auth_decorator import token_required
@@ -14,6 +16,29 @@ import time
 import random
 
 matches_bp = Blueprint('matches', __name__)
+
+
+def _check_team_access(user, team_id):
+    """验证团队存在且用户是成员，返回 (team, error_response)"""
+    team = Team.query.filter_by(id=team_id, deleted=0).first()
+    if not team:
+        return None, bad_request("团队不存在")
+    member = TeamMember.query.filter_by(team_id=team_id, user_id=user.id).first()
+    if not member:
+        return None, bad_request("您不是该团队的成员")
+    return team, None
+
+
+def _check_match_access(user, match):
+    """验证用户有权访问该比赛，返回 error_response 或 None"""
+    if match.team_id:
+        member = TeamMember.query.filter_by(team_id=match.team_id, user_id=user.id).first()
+        if not member:
+            return bad_request("您无权访问该比赛")
+    else:
+        if match.created_by != user.id:
+            return not_found("比赛记录不存在")
+    return None
 
 
 @matches_bp.route('', methods=['POST'])
@@ -26,6 +51,14 @@ def create_match():
     ok, msg = validate_match_type(match_type)
     if not ok:
         return bad_request(msg)
+
+    team_id = data.get('team_id')
+
+    # 验证 team_id
+    if team_id:
+        team, err = _check_team_access(user, team_id)
+        if err:
+            return err
 
     scores_data = data.get('scores', [])
 
@@ -51,7 +84,10 @@ def create_match():
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if team_id:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == team_id, Player.deleted == 0).all()
+        else:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
         if len(players) != len(player_ids):
             return bad_request("选手不存在或不属于当前用户")
     else:
@@ -65,7 +101,10 @@ def create_match():
         if len(player_ids) != expected_count:
             return bad_request(f"{match_type}需要{expected_count}名选手")
 
-        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if team_id:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == team_id, Player.deleted == 0).all()
+        else:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
         if len(players) != len(player_ids):
             return bad_request("选手不存在或不属于当前用户")
 
@@ -74,18 +113,23 @@ def create_match():
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        if gender_req:
-            for pid in player_ids:
-                if player_map[pid].gender != gender_req:
-                    return bad_request(f"该比赛类型要求选手性别为{gender_req}")
+        players_genders = [player_map[pid].gender for pid in player_ids]
+        ok, msg = validate_match_gender(match_type, players_genders)
+        if not ok:
+            return bad_request(msg)
 
-        if match_type == 'xd':
-            team1_ids = player_ids[:2]
-            team2_ids = player_ids[2:]
-            team1_genders = [player_map[pid].gender for pid in team1_ids]
-            team2_genders = [player_map[pid].gender for pid in team2_ids]
-            if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
-                return bad_request("混双每队必须为一男一女组合")
+    # 个人比赛必须包含本人绑定的选手
+    if not team_id:
+        bound_player = Player.query.filter_by(
+            created_by=user.id, deleted=0, team_id=None
+        ).first()
+        if bound_player:
+            if is_unlimited:
+                participant_ids = player_ids
+            else:
+                participant_ids = player_ids
+            if bound_player.id not in participant_ids:
+                return bad_request("个人比赛必须包含本人绑定的选手")
 
     if not scores_data:
         return bad_request("比分数据不能为空")
@@ -106,6 +150,7 @@ def create_match():
             type=match_type,
             match_time=now,
             created_by=user.id,
+            team_id=team_id if team_id else None,
             created_at=now
         )
         db.session.add(match)
@@ -171,7 +216,15 @@ def query_matches():
     page = validate_page(data.get('page', 1))
     page_size = validate_page_size(data.get('page_size', 10))
 
-    query = Match.query.filter_by(created_by=user.id, deleted=0)
+    team_id = data.get('team_id')
+
+    if team_id:
+        team, err = _check_team_access(user, team_id)
+        if err:
+            return err
+        query = Match.query.filter_by(team_id=team_id, deleted=0)
+    else:
+        query = Match.query.filter_by(created_by=user.id, deleted=0, team_id=None)
 
     start_time = data.get('start_time')
     end_time = data.get('end_time')
@@ -199,11 +252,18 @@ def query_matches():
 
     member_name = data.get('member_name', '').strip()
     if member_name:
-        subquery = MatchPlayer.query.join(Player).filter(
-            Player.name.contains(member_name),
-            Player.created_by == user.id,
-            Player.deleted == 0
-        ).with_entities(MatchPlayer.match_id).subquery()
+        if team_id:
+            subquery = MatchPlayer.query.join(Player).filter(
+                Player.name.contains(member_name),
+                Player.team_id == team_id,
+                Player.deleted == 0
+            ).with_entities(MatchPlayer.match_id).subquery()
+        else:
+            subquery = MatchPlayer.query.join(Player).filter(
+                Player.name.contains(member_name),
+                Player.created_by == user.id,
+                Player.deleted == 0
+            ).with_entities(MatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
     total = query.count()
@@ -226,9 +286,14 @@ def query_matches():
 @token_required
 def get_match(match_id):
     user = request.current_user
-    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
+    match = Match.query.filter_by(id=match_id, deleted=0).first()
     if not match:
         return not_found("比赛记录不存在")
+
+    err = _check_match_access(user, match)
+    if err:
+        return err
+
     return success(match.to_dict(include_details=True))
 
 
@@ -242,13 +307,18 @@ def update_match():
     if not match_id:
         return bad_request("比赛ID不能为空")
 
-    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
+    match = Match.query.filter_by(id=match_id, deleted=0).first()
     if not match:
         return not_found("比赛记录不存在")
+
+    err = _check_match_access(user, match)
+    if err:
+        return err
 
     # 比赛类型不可更改，使用原始类型
     match_type = match.type
     is_unlimited = match_type in UNLIMITED_MATCH_TYPES
+    match_team_id = match.team_id
 
     scores_data = data.get('scores', [])
 
@@ -272,7 +342,10 @@ def update_match():
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if match_team_id:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == match_team_id, Player.deleted == 0).all()
+        else:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
         if len(players) != len(player_ids):
             return bad_request("选手不存在或不属于当前用户")
     else:
@@ -286,7 +359,10 @@ def update_match():
         if len(player_ids) != expected_count:
             return bad_request(f"{match_type}需要{expected_count}名选手")
 
-        players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
+        if match_team_id:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == match_team_id, Player.deleted == 0).all()
+        else:
+            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
         if len(players) != len(player_ids):
             return bad_request("选手不存在或不属于当前用户")
 
@@ -295,18 +371,10 @@ def update_match():
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        if gender_req:
-            for pid in player_ids:
-                if player_map[pid].gender != gender_req:
-                    return bad_request(f"该比赛类型要求选手性别为{gender_req}")
-
-        if match_type == 'xd':
-            team1_ids = player_ids[:2]
-            team2_ids = player_ids[2:]
-            team1_genders = [player_map[pid].gender for pid in team1_ids]
-            team2_genders = [player_map[pid].gender for pid in team2_ids]
-            if sorted(team1_genders) != ['female', 'male'] or sorted(team2_genders) != ['female', 'male']:
-                return bad_request("混双每队必须为一男一女组合")
+        players_genders = [player_map[pid].gender for pid in player_ids]
+        ok, msg = validate_match_gender(match_type, players_genders)
+        if not ok:
+            return bad_request(msg)
 
     if not scores_data:
         return bad_request("比分数据不能为空")
@@ -382,9 +450,13 @@ def delete_match():
     if not match_id:
         return bad_request("比赛ID不能为空")
 
-    match = Match.query.filter_by(id=match_id, created_by=user.id, deleted=0).first()
+    match = Match.query.filter_by(id=match_id, deleted=0).first()
     if not match:
         return not_found("比赛记录不存在")
+
+    err = _check_match_access(user, match)
+    if err:
+        return err
 
     match.deleted = 1
     db.session.commit()

@@ -3,6 +3,7 @@ from utils.validators import (
     validate_player_name, validate_gender, validate_match_type,
     validate_score, validate_page, validate_page_size,
     validate_team_name, validate_invite_code, generate_invite_code,
+    validate_match_gender,
     VALID_MATCH_TYPES
 )
 
@@ -280,3 +281,136 @@ class TestGenerateInviteCode:
     def test_uniqueness(self):
         codes = {generate_invite_code() for _ in range(100)}
         assert len(codes) > 90
+
+
+class TestValidateTeamNameBoundary:
+    def test_min_length_valid(self):
+        ok, _ = validate_team_name('ab')
+        assert ok is True
+
+    def test_max_length_valid(self):
+        ok, _ = validate_team_name('a' * 20)
+        assert ok is True
+
+    def test_one_char(self):
+        ok, _ = validate_team_name('a')
+        assert ok is False
+
+    def test_21_chars(self):
+        ok, _ = validate_team_name('a' * 21)
+        assert ok is False
+
+    def test_chinese_name(self):
+        ok, _ = validate_team_name('羽毛球队')
+        assert ok is True
+
+    def test_mixed_name(self):
+        ok, _ = validate_team_name('TeamA')
+        assert ok is True
+
+
+class TestValidateInviteCodeBoundary:
+    def test_exactly_8_chars(self):
+        ok, _ = validate_invite_code('abcd1234')
+        assert ok is True
+
+    def test_7_chars(self):
+        ok, _ = validate_invite_code('abcd123')
+        assert ok is False
+
+    def test_9_chars(self):
+        ok, _ = validate_invite_code('abcd12345')
+        assert ok is False
+
+    def test_uppercase(self):
+        ok, _ = validate_invite_code('ABCD1234')
+        assert ok is True
+
+    def test_all_digits(self):
+        ok, _ = validate_invite_code('12345678')
+        assert ok is True
+
+    def test_all_letters(self):
+        ok, _ = validate_invite_code('abcdefgh')
+        assert ok is True
+
+
+class TestValidateMatchGender:
+    # 男单
+    def test_ms_valid(self):
+        ok, _ = validate_match_gender('ms', ['male', 'male'])
+        assert ok is True
+
+    def test_ms_with_female(self):
+        ok, msg = validate_match_gender('ms', ['male', 'female'])
+        assert ok is False
+        assert '男' in msg
+
+    # 女单
+    def test_ws_valid(self):
+        ok, _ = validate_match_gender('ws', ['female', 'female'])
+        assert ok is True
+
+    def test_ws_with_male(self):
+        ok, msg = validate_match_gender('ws', ['female', 'male'])
+        assert ok is False
+        assert '女' in msg
+
+    # 男双
+    def test_md_valid(self):
+        ok, _ = validate_match_gender('md', ['male', 'male', 'male', 'male'])
+        assert ok is True
+
+    def test_md_with_female(self):
+        ok, msg = validate_match_gender('md', ['male', 'male', 'male', 'female'])
+        assert ok is False
+
+    # 女双
+    def test_wd_valid(self):
+        ok, _ = validate_match_gender('wd', ['female', 'female', 'female', 'female'])
+        assert ok is True
+
+    def test_wd_with_male(self):
+        ok, msg = validate_match_gender('wd', ['female', 'female', 'female', 'male'])
+        assert ok is False
+
+    # 混双
+    def test_xd_valid(self):
+        ok, _ = validate_match_gender('xd', ['male', 'female', 'male', 'female'])
+        assert ok is True
+
+    def test_xd_valid_reversed(self):
+        ok, _ = validate_match_gender('xd', ['female', 'male', 'female', 'male'])
+        assert ok is True
+
+    def test_xd_team1_all_male(self):
+        ok, msg = validate_match_gender('xd', ['male', 'male', 'male', 'female'])
+        assert ok is False
+        assert '队伍1' in msg
+
+    def test_xd_team2_all_female(self):
+        ok, msg = validate_match_gender('xd', ['male', 'female', 'female', 'female'])
+        assert ok is False
+        assert '队伍2' in msg
+
+    def test_xd_wrong_count(self):
+        ok, msg = validate_match_gender('xd', ['male', 'female'])
+        assert ok is False
+        assert '4' in msg
+
+    # 无性别限制
+    def test_os_any_gender(self):
+        ok, _ = validate_match_gender('os', ['male', 'female'])
+        assert ok is True
+
+    def test_od_any_gender(self):
+        ok, _ = validate_match_gender('od', ['male', 'female', 'female', 'male'])
+        assert ok is True
+
+    def test_fs_any_gender(self):
+        ok, _ = validate_match_gender('fs', ['female', 'male'])
+        assert ok is True
+
+    def test_fd_any_gender(self):
+        ok, _ = validate_match_gender('fd', ['male', 'male', 'female', 'female'])
+        assert ok is True

@@ -24,6 +24,101 @@ const ShuttleMatches = {
         return type === 'fs' || type === 'fd';
     },
 
+    getMyBoundPlayer() {
+        const user = ShuttleAuth.getUser();
+        if (!user) return null;
+        // 1. 优先查找 user_id 绑定的选手（不限 team_id）
+        const byUserId = this.allPlayers.find(p => p.user_id === user.id && p.deleted === 0);
+        if (byUserId) {
+            console.log('[ShuttleMatch] getMyBoundPlayer: found by user_id', byUserId);
+            return byUserId;
+        }
+        // 2. 其次查找名称和性别与用户一致的个人选手（自动创建的选手）
+        const byUserInfo = this.allPlayers.find(p =>
+            p.created_by === user.id && !p.team_id && p.deleted === 0 &&
+            p.name === user.username && p.gender === user.gender
+        );
+        if (byUserInfo) {
+            console.log('[ShuttleMatch] getMyBoundPlayer: found by user info match', byUserInfo);
+            return byUserInfo;
+        }
+        // 3. 最后 fallback 到 created_by 的第一个个人选手
+        const byCreatedBy = this.allPlayers.find(p => p.created_by === user.id && !p.team_id && p.deleted === 0);
+        console.log('[ShuttleMatch] getMyBoundPlayer: fallback to created_by', byCreatedBy);
+        return byCreatedBy || null;
+    },
+
+    getMyBoundPlayerId() {
+        const p = this.getMyBoundPlayer();
+        return p ? p.id : null;
+    },
+
+    validatePersonalMatch() {
+        const myPlayerId = this.getMyBoundPlayerId();
+        if (!myPlayerId) return true; // 没有绑定选手则跳过校验
+        if (!this.selectedPlayers.includes(myPlayerId)) {
+            ShuttleNav.showToast('个人比赛必须包含本人绑定的选手', 'error');
+            return false;
+        }
+        return true;
+    },
+
+    validatePersonalMatchUnlimited() {
+        const myPlayerId = this.getMyBoundPlayerId();
+        if (!myPlayerId) return true;
+        const allSelected = [...this.unlimitedPlayers.team1, ...this.unlimitedPlayers.team2];
+        if (!allSelected.includes(myPlayerId)) {
+            ShuttleNav.showToast('个人比赛必须包含本人绑定的选手', 'error');
+            return false;
+        }
+        return true;
+    },
+
+    validateGender() {
+        const info = this.MATCH_TYPES[this.matchType];
+        if (!info.gender && this.matchType !== 'xd') return true;
+
+        const playerMap = {};
+        this.allPlayers.forEach(p => playerMap[p.id] = p);
+
+        if (this.isUnlimitedType(this.matchType)) {
+            return true; // 无限制比赛不校验性别
+        }
+
+        const players = this.selectedPlayers.map(id => playerMap[id]).filter(Boolean);
+
+        if (this.matchType === 'xd') {
+            // 混双：每队1男1女
+            const team1 = [players[0], players[1]];
+            const team2 = [players[2], players[3]];
+            const t1males = team1.filter(p => p.gender === 'male').length;
+            const t1females = team1.filter(p => p.gender === 'female').length;
+            const t2males = team2.filter(p => p.gender === 'male').length;
+            const t2females = team2.filter(p => p.gender === 'female').length;
+            if (t1males !== 1 || t1females !== 1) {
+                ShuttleNav.showToast('队伍1需要1名男选手和1名女选手', 'error');
+                return false;
+            }
+            if (t2males !== 1 || t2females !== 1) {
+                ShuttleNav.showToast('队伍2需要1名男选手和1名女选手', 'error');
+                return false;
+            }
+        } else if (info.gender === 'male') {
+            const wrong = players.find(p => p.gender !== 'male');
+            if (wrong) {
+                ShuttleNav.showToast(`${wrong.name}不是男选手，无法参加${info.label}`, 'error');
+                return false;
+            }
+        } else if (info.gender === 'female') {
+            const wrong = players.find(p => p.gender !== 'female');
+            if (wrong) {
+                ShuttleNav.showToast(`${wrong.name}不是女选手，无法参加${info.label}`, 'error');
+                return false;
+            }
+        }
+        return true;
+    },
+
     async initRecord() {
         await this.loadPlayers();
         this.bindRecordEvents();
@@ -48,8 +143,12 @@ const ShuttleMatches = {
                 document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
                 el.classList.add('selected');
                 this.matchType = el.dataset.type;
-                // 切换类型时重置无限制选手
-                this.unlimitedPlayers = { team1: [], team2: [] };
+                // 切换类型时重置无限制选手，队伍1第0位固定为本人选手
+                const myPlayerId = this.getMyBoundPlayerId();
+                this.unlimitedPlayers = {
+                    team1: myPlayerId ? [myPlayerId] : [],
+                    team2: []
+                };
             });
         });
 
@@ -152,12 +251,24 @@ const ShuttleMatches = {
                     ShuttleNav.showToast('每队至少需要1名选手', 'error');
                     return;
                 }
+                // 个人比赛校验：本人绑定选手必须参赛
+                if (!this.validatePersonalMatchUnlimited()) {
+                    return;
+                }
             } else {
                 this.collectPlayerIds();
                 const info = this.MATCH_TYPES[this.matchType];
                 const needed = info.category === 'singles' ? 2 : 4;
                 if (this.selectedPlayers.length !== needed) {
                     ShuttleNav.showToast(`该类型需要${needed}名选手`, 'error');
+                    return;
+                }
+                // 个人比赛校验：本人绑定选手必须参赛
+                if (!this.validatePersonalMatch()) {
+                    return;
+                }
+                // 性别校验
+                if (!this.validateGender()) {
                     return;
                 }
             }
@@ -200,18 +311,34 @@ const ShuttleMatches = {
         this.collectUnlimitedPlayerIds();
 
         const allPlayers = this.allPlayers; // 不限制性别
+        const myPlayer = this.getMyBoundPlayer();
+
+        // 本人选手固定在队伍1第1个位置
+        const myPlayerHtml = myPlayer
+            ? `<div class="form-group">
+                <select class="form-select my-player-select" disabled><option selected>${myPlayer.name} (${myPlayer.gender === 'male' ? '男' : '女'})</option></select>
+               </div>`
+            : '';
 
         const renderTeam = (teamKey, label) => {
             const playerIds = this.unlimitedPlayers[teamKey];
             let html = `<div><div class="team-label">${label}</div>`;
-            playerIds.forEach((pid, idx) => {
+
+            // 队伍1第1个位置固定为本人选手
+            if (teamKey === 'team1') {
+                html += myPlayerHtml;
+            }
+
+            // 队伍1从第2个开始才是可选择的，队伍2全部可选
+            const startIdx = teamKey === 'team1' ? 1 : 0;
+            for (let idx = startIdx; idx < playerIds.length; idx++) {
                 html += `<div class="form-group" style="display:flex;gap:6px;align-items:center;">
                     <select class="form-select unlimited-player-select" data-team="${teamKey}" data-idx="${idx}" style="flex:1;">
                         <option value="">选择选手</option>
                     </select>
-                    ${playerIds.length > 1 ? `<button type="button" class="btn btn-sm btn-danger unlimited-remove-btn" data-team="${teamKey}" data-idx="${idx}" style="padding:4px 8px;">✕</button>` : ''}
+                    ${playerIds.length > (teamKey === 'team1' ? 1 : 1) ? `<button type="button" class="btn btn-sm btn-danger unlimited-remove-btn" data-team="${teamKey}" data-idx="${idx}" style="padding:4px 8px;">✕</button>` : ''}
                 </div>`;
-            });
+            }
             html += `<button type="button" class="btn btn-outline btn-sm unlimited-add-btn" data-team="${teamKey}" style="margin-top:4px;">+ 添加选手</button>`;
             html += '</div>';
             return html;
@@ -232,6 +359,8 @@ const ShuttleMatches = {
             btn.addEventListener('click', () => {
                 const team = btn.dataset.team;
                 const idx = parseInt(btn.dataset.idx);
+                // 不允许删除队伍1的第0个位置（本人选手）
+                if (team === 'team1' && idx === 0) return;
                 this.unlimitedPlayers[team].splice(idx, 1);
                 this.renderUnlimitedPlayerSelection();
             });
@@ -242,6 +371,7 @@ const ShuttleMatches = {
 
     updateUnlimitedPlayerOptions() {
         const allPlayers = this.allPlayers;
+        const myPlayerId = this.getMyBoundPlayerId();
         const selects = document.querySelectorAll('.unlimited-player-select');
 
         // 优先从 unlimitedPlayers 数据模型读取已选值，DOM 值作为补充
@@ -265,6 +395,8 @@ const ShuttleMatches = {
                 const val = currentValues[key];
                 if (val) ids.push(parseInt(val));
             });
+            // 本人选手也要排除
+            if (myPlayerId) ids.push(myPlayerId);
             return ids;
         };
 
@@ -289,6 +421,12 @@ const ShuttleMatches = {
     },
 
     collectUnlimitedPlayerIds() {
+        // 确保队伍1第0位是本人选手
+        const myPlayerId = this.getMyBoundPlayerId();
+        if (myPlayerId && this.unlimitedPlayers.team1.length > 0) {
+            this.unlimitedPlayers.team1[0] = myPlayerId;
+        }
+
         // 按索引更新已有值，保留 null 占位符，不清空数组
         const selects = document.querySelectorAll('.unlimited-player-select');
         selects.forEach(sel => {
@@ -301,6 +439,11 @@ const ShuttleMatches = {
                 this.unlimitedPlayers.team2[idx] = val || null;
             }
         });
+
+        // 再次确保队伍1第0位是本人选手（不被覆盖）
+        if (myPlayerId && this.unlimitedPlayers.team1.length > 0) {
+            this.unlimitedPlayers.team1[0] = myPlayerId;
+        }
     },
 
     // ===== 常规比赛：选手选择 =====
@@ -315,13 +458,23 @@ const ShuttleMatches = {
         const isDoubles = info.category === 'doubles';
         const isXd = this.matchType === 'xd';
         const filteredPlayers = this.getFilteredPlayers();
+        const myPlayer = this.getMyBoundPlayer();
+
+        console.log('[ShuttleMatch] renderPlayerSelection: matchType=', this.matchType, 'myPlayer=', myPlayer, 'allPlayers=', this.allPlayers.length, 'filteredPlayers=', filteredPlayers.length);
 
         const team1Label = isDoubles ? '队伍1' : '选手1';
         const team2Label = isDoubles ? '队伍2' : '选手2';
 
+        // 本人选手固定在队伍1第1个位置（单打为选手1）
+        const myPlayerHtml = myPlayer
+            ? `<div class="form-group">
+                <select class="form-select my-player-select" disabled><option selected>${myPlayer.name} (${myPlayer.gender === 'male' ? '男' : '女'})</option></select>
+               </div>`
+            : '';
+
         const selectIds = isDoubles
-            ? ['player-t1p1', 'player-t1p2', 'player-t2p1', 'player-t2p2']
-            : ['player-t1p1', 'player-t2p1'];
+            ? ['player-t1p2', 'player-t2p1', 'player-t2p2']
+            : ['player-t2p1'];
 
         let html = '';
         if (isXd) {
@@ -329,11 +482,9 @@ const ShuttleMatches = {
                 <div class="player-select-area">
                     <div>
                         <div class="team-label">${team1Label}</div>
+                        ${myPlayerHtml}
                         <div class="form-group">
-                            <select id="player-t1p1" class="form-select" data-slot="0" data-gender="male"><option value="">选择男选手</option></select>
-                        </div>
-                        <div class="form-group">
-                            <select id="player-t1p2" class="form-select" data-slot="1" data-gender="female"><option value="">选择女选手</option></select>
+                            <select id="player-t1p2" class="form-select" data-slot="1" data-gender="${myPlayer && myPlayer.gender === 'male' ? 'female' : 'male'}"><option value="">选择${myPlayer && myPlayer.gender === 'male' ? '女' : '男'}选手</option></select>
                         </div>
                     </div>
                     <div>
@@ -352,9 +503,7 @@ const ShuttleMatches = {
                 <div class="player-select-area">
                     <div>
                         <div class="team-label">${team1Label}</div>
-                        <div class="form-group">
-                            <select id="player-t1p1" class="form-select" data-slot="0"><option value="">选择选手</option></select>
-                        </div>
+                        ${myPlayerHtml}
                         <div class="form-group">
                             <select id="player-t1p2" class="form-select" data-slot="1"><option value="">选择选手</option></select>
                         </div>
@@ -375,9 +524,7 @@ const ShuttleMatches = {
                 <div class="player-select-area">
                     <div>
                         <div class="team-label">${team1Label}</div>
-                        <div class="form-group">
-                            <select id="player-t1p1" class="form-select" data-slot="0"><option value="">选择选手</option></select>
-                        </div>
+                        ${myPlayerHtml}
                     </div>
                     <div>
                         <div class="team-label">${team2Label}</div>
@@ -406,15 +553,20 @@ const ShuttleMatches = {
         const isDoubles = info.category === 'doubles';
         const isXd = this.matchType === 'xd';
         const filteredPlayers = this.getFilteredPlayers();
+        const myPlayerId = this.getMyBoundPlayerId();
+
         const selectIds = isDoubles
-            ? ['player-t1p1', 'player-t1p2', 'player-t2p1', 'player-t2p2']
-            : ['player-t1p1', 'player-t2p1'];
+            ? ['player-t1p2', 'player-t2p1', 'player-t2p2']
+            : ['player-t2p1'];
 
         const currentValues = {};
         selectIds.forEach(id => {
             const sel = document.getElementById(id);
             if (sel) currentValues[id] = sel.value;
         });
+
+        // 本人选手ID需要排除（不可被其他位置选择）
+        const myId = myPlayerId;
 
         selectIds.forEach(id => {
             const sel = document.getElementById(id);
@@ -425,7 +577,11 @@ const ShuttleMatches = {
                 .filter(otherId => otherId !== id && currentValues[otherId])
                 .map(otherId => parseInt(currentValues[otherId]));
 
-            let availablePlayers = filteredPlayers.filter(p => !otherSelectedIds.includes(p.id));
+            // 排除本人选手和已选选手
+            let excludeIds = [...otherSelectedIds];
+            if (myId) excludeIds.push(myId);
+
+            let availablePlayers = filteredPlayers.filter(p => !excludeIds.includes(p.id));
 
             if (isXd) {
                 const slotGender = sel.dataset.gender;
@@ -452,10 +608,11 @@ const ShuttleMatches = {
     collectPlayerIds() {
         const info = this.MATCH_TYPES[this.matchType];
         const isDoubles = info.category === 'doubles';
+        const myPlayerId = this.getMyBoundPlayerId();
         const ids = [];
 
-        const t1p1 = document.getElementById('player-t1p1')?.value;
-        if (t1p1) ids.push(parseInt(t1p1));
+        // 队伍1第1个位置：本人绑定选手
+        if (myPlayerId) ids.push(myPlayerId);
 
         if (isDoubles) {
             const t1p2 = document.getElementById('player-t1p2')?.value;

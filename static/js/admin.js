@@ -3,11 +3,12 @@ const ShuttleAdmin = {
     pageSize: 20,
 
     async loadDashboard() {
-        const [usersRes, matchesRes, playersRes, adminsRes] = await Promise.all([
+        const [usersRes, matchesRes, playersRes, adminsRes, teamsRes] = await Promise.all([
             ShuttleAPI.admin.getUsers(1, 1),
             ShuttleAPI.admin.queryMatches({ page: 1, page_size: 1 }),
             ShuttleAPI.admin.getPlayers(1, 1),
-            ShuttleAPI.admin.getAdmins()
+            ShuttleAPI.admin.getAdmins(),
+            ShuttleAPI.admin.getTeams(1, 1)
         ]);
 
         document.getElementById('stat-users').textContent = usersRes.ok ? usersRes.data.total : 0;
@@ -16,6 +17,8 @@ const ShuttleAdmin = {
 
         const adminCount = adminsRes.ok ? adminsRes.data.length : 0;
         document.getElementById('stat-admins').textContent = adminCount;
+
+        document.getElementById('stat-teams').textContent = teamsRes.ok ? teamsRes.data.total : 0;
     },
 
     async loadAdmins() {
@@ -351,5 +354,157 @@ const ShuttleAdmin = {
         } else {
             ShuttleNav.showToast(res.msg || '保存失败', 'error');
         }
+    },
+
+    // ===== Team Management =====
+
+    teamSearchKeyword: '',
+
+    async loadTeams(page) {
+        this.currentPage = page || 1;
+        const search = this.teamSearchKeyword;
+        const res = await ShuttleAPI.admin.getTeams(this.currentPage, this.pageSize, search);
+        if (!res.ok) {
+            ShuttleNav.showToast(res.msg || '加载失败', 'error');
+            return;
+        }
+
+        const data = res.data;
+        const container = document.getElementById('team-list');
+        const paginationEl = document.getElementById('team-pagination');
+        if (!container) return;
+
+        const items = data.items || [];
+        if (items.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">暂无团队</div></div>';
+            if (paginationEl) paginationEl.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = `<table class="data-table">
+            <thead><tr><th>ID</th><th>团队名称</th><th>创建者</th><th>成员数</th><th>选手数</th><th>比赛数</th><th>邀请码</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody>${items.map(t => `
+                <tr>
+                    <td>${t.id}</td>
+                    <td>${t.name}</td>
+                    <td>${t.creator_username}</td>
+                    <td>${t.member_count}</td>
+                    <td>${t.player_count}</td>
+                    <td>${t.match_count}</td>
+                    <td><code style="font-family:var(--font-score);font-size:12px;">${t.invite_code}</code></td>
+                    <td>${ShuttleNav.formatDate(t.created_at)}</td>
+                    <td>
+                        <a href="/pages/admin/team-detail.html?id=${t.id}" class="action-link">查看</a>
+                        <span class="action-link action-link-danger" onclick="ShuttleAdmin.deleteTeam(${t.id})">解散</span>
+                    </td>
+                </tr>
+            `).join('')}</tbody>
+        </table>`;
+
+        this.renderPagination('team-pagination', data.total, data.page, data.page_size, 'ShuttleAdmin.loadTeams');
+    },
+
+    searchTeams() {
+        const input = document.getElementById('team-search');
+        this.teamSearchKeyword = input ? input.value.trim() : '';
+        this.loadTeams(1);
+    },
+
+    async deleteTeam(teamId) {
+        if (!confirm('确定要解散该团队吗？解散后团队及其选手将被标记为已删除，比赛记录保留。')) return;
+        const res = await ShuttleAPI.admin.deleteTeam(teamId);
+        if (res.ok) {
+            ShuttleNav.showToast('团队已解散');
+            this.loadTeams(this.currentPage);
+        } else {
+            ShuttleNav.showToast(res.msg || '解散失败', 'error');
+        }
+    },
+
+    async loadTeamDetail(teamId) {
+        const res = await ShuttleAPI.admin.getTeam(teamId);
+        if (!res.ok) {
+            ShuttleNav.showToast(res.msg || '加载失败', 'error');
+            return;
+        }
+
+        const team = res.data;
+
+        // Team info
+        const infoEl = document.getElementById('team-info');
+        if (infoEl) {
+            infoEl.innerHTML = `
+                <div class="card" style="margin-bottom:16px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+                        <div><span style="color:var(--text-secondary);font-size:13px;">团队名称</span><div style="font-weight:600;margin-top:4px;">${team.name}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">邀请码</span><div style="font-family:var(--font-score);margin-top:4px;">${team.invite_code}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">创建者</span><div style="margin-top:4px;">${team.creator_username}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">创建时间</span><div style="margin-top:4px;">${ShuttleNav.formatDate(team.created_at)}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">成员数</span><div style="margin-top:4px;">${(team.members || []).length}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">选手数</span><div style="margin-top:4px;">${(team.players || []).length}</div></div>
+                        <div><span style="color:var(--text-secondary);font-size:13px;">比赛数</span><div style="margin-top:4px;">${team.match_count}</div></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Members
+        const memberEl = document.getElementById('member-list');
+        if (memberEl) {
+            const members = team.members || [];
+            if (members.length === 0) {
+                memberEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">暂无成员</div></div>';
+            } else {
+                memberEl.innerHTML = `<table class="data-table">
+                    <thead><tr><th>用户ID</th><th>用户名</th><th>加入时间</th></tr></thead>
+                    <tbody>${members.map(m => `
+                        <tr>
+                            <td>${m.user_id}</td>
+                            <td>${m.username || '-'}</td>
+                            <td>${ShuttleNav.formatDate(m.joined_at)}</td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>`;
+            }
+        }
+
+        // Players
+        const playerEl = document.getElementById('player-list');
+        if (playerEl) {
+            const players = team.players || [];
+            if (players.length === 0) {
+                playerEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">暂无选手</div></div>';
+            } else {
+                playerEl.innerHTML = `<table class="data-table">
+                    <thead><tr><th>ID</th><th>名称</th><th>性别</th><th>绑定用户</th><th>角色</th><th>创建时间</th></tr></thead>
+                    <tbody>${players.map(p => `
+                        <tr>
+                            <td>${p.id}</td>
+                            <td>${p.name}</td>
+                            <td><span class="tag ${p.gender === 'male' ? 'tag-ms' : 'tag-ws'}">${p.gender === 'male' ? '男' : '女'}</span></td>
+                            <td>${p.bound_username || '-'}</td>
+                            <td>${p.role === 'admin' ? '管理员' : '成员'}</td>
+                            <td>${ShuttleNav.formatDate(p.created_at)}</td>
+                        </tr>
+                    `).join('')}</tbody>
+                </table>`;
+            }
+        }
+
+        // Store team id for delete
+        this._currentTeamId = team.id;
+        this._currentTeamName = team.name;
+    },
+
+    confirmDeleteTeam() {
+        if (!confirm(`确定要解散团队"${this._currentTeamName || ''}"吗？解散后团队及其选手将被标记为已删除，比赛记录保留。`)) return;
+        ShuttleAPI.admin.deleteTeam(this._currentTeamId).then(res => {
+            if (res.ok) {
+                ShuttleNav.showToast('团队已解散');
+                setTimeout(() => { window.location.href = '/pages/admin/teams.html'; }, 1500);
+            } else {
+                ShuttleNav.showToast(res.msg || '解散失败', 'error');
+            }
+        });
     }
 };
