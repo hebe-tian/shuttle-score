@@ -1,7 +1,8 @@
 from flask import Blueprint, request
 from extensions import db
 from models.team import Team, TeamMember
-from models.player import Player
+from models.team_player import TeamPlayer
+from models.single_player import SinglePlayer
 from models.user import User
 from utils.response import success, bad_request, not_found, forbidden, conflict
 from utils.validators import validate_team_name, validate_invite_code, generate_invite_code, validate_player_name, validate_gender
@@ -42,12 +43,11 @@ def create_team():
     )
     db.session.add(member)
 
-    player = Player(
+    player = TeamPlayer(
         name=user.username,
         gender=user.gender,
-        created_by=user.id,
-        user_id=user.id,
         team_id=team.id,
+        user_id=user.id,
         role='admin',
         created_at=now
     )
@@ -74,7 +74,7 @@ def list_teams():
     result = []
     for team in teams:
         member_count = TeamMember.query.filter_by(team_id=team.id).count()
-        player_count = Player.query.filter_by(team_id=team.id, deleted=0).count()
+        player_count = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).count()
         result.append({
             "id": team.id,
             "name": team.name,
@@ -115,7 +115,7 @@ def resolve_team():
     if existing:
         return conflict("你已是该团队成员")
 
-    players = Player.query.filter_by(team_id=team.id, deleted=0).all()
+    players = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).all()
     unbound = [p.to_dict() for p in players if not p.user_id]
 
     return success({
@@ -149,7 +149,7 @@ def get_team(team_id):
             "joined_at": m.joined_at
         })
 
-    players = Player.query.filter_by(team_id=team.id, deleted=0).all()
+    players = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).all()
     player_list = [p.to_dict() for p in players]
 
     return success({
@@ -191,12 +191,11 @@ def join_team(team_id):
     now = int(time.time())
 
     if action == 'create':
-        player = Player(
+        player = TeamPlayer(
             name=user.username,
             gender=user.gender,
-            created_by=user.id,
-            user_id=user.id,
             team_id=team.id,
+            user_id=user.id,
             role='member',
             created_at=now
         )
@@ -205,7 +204,7 @@ def join_team(team_id):
         if not bind_player_id:
             return bad_request("缺少绑定选手ID")
 
-        player = Player.query.filter_by(id=bind_player_id, team_id=team.id, deleted=0).first()
+        player = TeamPlayer.query.filter_by(id=bind_player_id, team_id=team.id, deleted=0).first()
         if not player:
             return not_found("选手不存在或不属于该团队")
 
@@ -244,7 +243,7 @@ def leave_team(team_id):
     if team.creator_id == user.id:
         return bad_request("创建者不能退出团队")
 
-    player = Player.query.filter_by(team_id=team.id, user_id=user.id, deleted=0).first()
+    player = TeamPlayer.query.filter_by(team_id=team.id, user_id=user.id, deleted=0).first()
     if player:
         player.user_id = None
 
@@ -297,10 +296,9 @@ def create_team_player(team_id):
         return bad_request(msg)
 
     now = int(time.time())
-    player = Player(
+    player = TeamPlayer(
         name=name,
         gender=gender,
-        created_by=user.id,
         team_id=team.id,
         role='member',
         created_at=now
@@ -324,5 +322,5 @@ def list_team_players(team_id):
     if not membership:
         return forbidden("你不是该团队成员")
 
-    players = Player.query.filter_by(team_id=team.id, deleted=0).all()
+    players = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).all()
     return success([p.to_dict() for p in players])

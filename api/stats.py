@@ -1,7 +1,8 @@
 from flask import Blueprint, request
 from extensions import db
-from models.match import Match, MatchPlayer, MatchScore
-from models.player import Player
+from models.match import Match, MatchScore, SingleMatchPlayer, TeamMatchPlayer
+from models.single_player import SinglePlayer
+from models.team_player import TeamPlayer
 from models.team import Team, TeamMember
 from utils.response import success, bad_request
 from utils.validators import validate_page, validate_page_size, VALID_MATCH_TYPES, MATCH_TYPE_CATEGORY
@@ -18,6 +19,22 @@ SINGLES_TYPES = ('ms', 'ws', 'os')
 DOUBLES_TYPES = ('md', 'wd', 'xd', 'od')
 
 
+def _get_match_players(match_id, team_id):
+    """根据比赛类型获取对应的选手列表"""
+    if team_id:
+        return TeamMatchPlayer.query.filter_by(match_id=match_id).all()
+    else:
+        return SingleMatchPlayer.query.filter_by(match_id=match_id).all()
+
+
+def _get_player_by_id(player_id, team_id):
+    """根据比赛类型获取对应的选手"""
+    if team_id:
+        return TeamPlayer.query.get(player_id)
+    else:
+        return SinglePlayer.query.get(player_id)
+
+
 def _get_target_player(user, team_id, player_id):
     """确定目标选手，返回 (player, error_response)"""
     if team_id:
@@ -26,34 +43,34 @@ def _get_target_player(user, team_id, player_id):
         if not member:
             return None, bad_request("您不是该团队的成员")
         if player_id:
-            player = Player.query.filter_by(id=player_id, team_id=team_id, deleted=0).first()
+            player = TeamPlayer.query.filter_by(id=player_id, team_id=team_id, deleted=0).first()
             if not player:
                 return None, bad_request("选手不存在或不属于该团队")
             return player, None
         else:
             # 查找团队中绑定当前用户的选手
-            player = Player.query.filter_by(team_id=team_id, user_id=user.id, deleted=0).first()
+            player = TeamPlayer.query.filter_by(team_id=team_id, user_id=user.id, deleted=0).first()
             if not player:
                 return None, bad_request("未找到您在该团队中绑定的选手")
             return player, None
     else:
         # 个人模式
         if player_id:
-            player = Player.query.filter_by(id=player_id, deleted=0).first()
+            player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
             if not player:
                 return None, bad_request("选手不存在")
             return player, None
         else:
-            player = Player.query.filter_by(user_id=user.id, deleted=0).first()
+            player = SinglePlayer.query.filter_by(user_id=user.id, deleted=0).first()
             if not player:
                 # 尝试通过名称和性别匹配（自动创建的选手）
-                player = Player.query.filter_by(
-                    created_by=user.id, team_id=None, deleted=0,
+                player = SinglePlayer.query.filter_by(
+                    created_by=user.id, deleted=0,
                     name=user.username, gender=user.gender
                 ).first()
             if not player:
                 # fallback: created_by 的第一个个人选手
-                player = Player.query.filter_by(created_by=user.id, team_id=None, deleted=0).first()
+                player = SinglePlayer.query.filter_by(created_by=user.id, deleted=0).first()
             if not player:
                 return None, bad_request("未找到您绑定的个人选手")
             return player, None
@@ -66,8 +83,8 @@ def _build_match_query(team_id, player, match_type_filter, include_unlimited, ti
     if team_id:
         query = Match.query.filter_by(team_id=team_id, deleted=0)
     else:
-        # 查找目标选手参与的比赛
-        match_ids_subquery = MatchPlayer.query.filter_by(player_id=player.id).with_entities(MatchPlayer.match_id).subquery()
+        # 查找目标选手参与的比赛（个人模式）
+        match_ids_subquery = SingleMatchPlayer.query.filter_by(player_id=player.id).with_entities(SingleMatchPlayer.match_id).subquery()
         query = Match.query.filter(Match.id.in_(db.session.query(match_ids_subquery.c.match_id)), Match.deleted == 0)
 
     # type 过滤
@@ -111,7 +128,7 @@ def opponent_win_rate():
     opponent_stats = {}
 
     for m in matches:
-        match_players = MatchPlayer.query.filter_by(match_id=m.id).all()
+        match_players = _get_match_players(m.id, m.team_id)
         # 找到目标选手所在的队伍
         target_mp = None
         for mp in match_players:
@@ -129,7 +146,7 @@ def opponent_win_rate():
             if mp.team != target_team:
                 pid = mp.player_id
                 if pid not in opponent_stats:
-                    p = Player.query.get(pid)
+                    p = _get_player_by_id(pid, m.team_id)
                     opponent_stats[pid] = {
                         "opponent_id": pid,
                         "opponent_name": p.name if p else "未知",
@@ -177,7 +194,7 @@ def partner_win_rate():
     partner_stats = {}
 
     for m in matches:
-        match_players = MatchPlayer.query.filter_by(match_id=m.id).all()
+        match_players = _get_match_players(m.id, m.team_id)
         # 找到目标选手所在的队伍
         target_mp = None
         for mp in match_players:
@@ -195,7 +212,7 @@ def partner_win_rate():
             if mp.team == target_team and mp.player_id != player.id:
                 pid = mp.player_id
                 if pid not in partner_stats:
-                    p = Player.query.get(pid)
+                    p = _get_player_by_id(pid, m.team_id)
                     partner_stats[pid] = {
                         "partner_id": pid,
                         "partner_name": p.name if p else "未知",
@@ -243,7 +260,7 @@ def team_player_win_rate():
     now = int(time.time())
 
     # 获取所有团队选手
-    team_players = Player.query.filter_by(team_id=team_id, deleted=0).all()
+    team_players = TeamPlayer.query.filter_by(team_id=team_id, deleted=0).all()
     if not team_players:
         return success([])
 
@@ -274,7 +291,7 @@ def team_player_win_rate():
         }
 
     for m in matches:
-        match_players = MatchPlayer.query.filter_by(match_id=m.id).all()
+        match_players = TeamMatchPlayer.query.filter_by(match_id=m.id).all()
         for mp in match_players:
             pid = mp.player_id
             if pid in player_stats:
@@ -346,28 +363,28 @@ def win_rate_stats():
     member_name = data.get('member_name', '').strip()
     if member_name:
         if team_id:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.team_id == team_id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = TeamMatchPlayer.query.join(TeamPlayer).filter(
+                TeamPlayer.name.contains(member_name),
+                TeamPlayer.team_id == team_id,
+                TeamPlayer.deleted == 0
+            ).with_entities(TeamMatchPlayer.match_id).subquery()
         else:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.created_by == user.id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = SingleMatchPlayer.query.join(SinglePlayer).filter(
+                SinglePlayer.name.contains(member_name),
+                SinglePlayer.created_by == user.id,
+                SinglePlayer.deleted == 0
+            ).with_entities(SingleMatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
     matches = query.all()
 
     player_stats = {}
     for m in matches:
-        match_players = MatchPlayer.query.filter_by(match_id=m.id).all()
+        match_players = _get_match_players(m.id, m.team_id)
         for mp in match_players:
             pid = mp.player_id
             if pid not in player_stats:
-                player = Player.query.get(pid)
+                player = _get_player_by_id(pid, m.team_id)
                 player_stats[pid] = {
                     "player_id": pid,
                     "player_name": player.name if player else "未知",
@@ -442,30 +459,30 @@ def score_stats():
     member_name = data.get('member_name', '').strip()
     if member_name:
         if team_id:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.team_id == team_id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = TeamMatchPlayer.query.join(TeamPlayer).filter(
+                TeamPlayer.name.contains(member_name),
+                TeamPlayer.team_id == team_id,
+                TeamPlayer.deleted == 0
+            ).with_entities(TeamMatchPlayer.match_id).subquery()
         else:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.created_by == user.id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = SingleMatchPlayer.query.join(SinglePlayer).filter(
+                SinglePlayer.name.contains(member_name),
+                SinglePlayer.created_by == user.id,
+                SinglePlayer.deleted == 0
+            ).with_entities(SingleMatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
     matches = query.all()
 
     player_scores = {}
     for m in matches:
-        match_players = MatchPlayer.query.filter_by(match_id=m.id).all()
+        match_players = _get_match_players(m.id, m.team_id)
         match_scores = MatchScore.query.filter_by(match_id=m.id).all()
 
         for mp in match_players:
             pid = mp.player_id
             if pid not in player_scores:
-                player = Player.query.get(pid)
+                player = _get_player_by_id(pid, m.team_id)
                 player_scores[pid] = {
                     "player_id": pid,
                     "player_name": player.name if player else "未知",

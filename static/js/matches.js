@@ -27,7 +27,7 @@ const ShuttleMatches = {
     getMyBoundPlayer() {
         const user = ShuttleAuth.getUser();
         if (!user) return null;
-        // 1. 优先查找 user_id 绑定的选手（不限 team_id）
+        // 1. 优先查找 user_id 绑定的选手
         const byUserId = this.allPlayers.find(p => p.user_id === user.id && p.deleted === 0);
         if (byUserId) {
             console.log('[ShuttleMatch] getMyBoundPlayer: found by user_id', byUserId);
@@ -35,15 +35,15 @@ const ShuttleMatches = {
         }
         // 2. 其次查找名称和性别与用户一致的个人选手（自动创建的选手）
         const byUserInfo = this.allPlayers.find(p =>
-            p.created_by === user.id && !p.team_id && p.deleted === 0 &&
+            p.created_by === user.id && p.deleted === 0 &&
             p.name === user.username && p.gender === user.gender
         );
         if (byUserInfo) {
             console.log('[ShuttleMatch] getMyBoundPlayer: found by user info match', byUserInfo);
             return byUserInfo;
         }
-        // 3. 最后 fallback 到 created_by 的第一个个人选手
-        const byCreatedBy = this.allPlayers.find(p => p.created_by === user.id && !p.team_id && p.deleted === 0);
+        // 3. 最后 fallback 到 created_by 的第一个选手
+        const byCreatedBy = this.allPlayers.find(p => p.created_by === user.id && p.deleted === 0);
         console.log('[ShuttleMatch] getMyBoundPlayer: fallback to created_by', byCreatedBy);
         return byCreatedBy || null;
     },

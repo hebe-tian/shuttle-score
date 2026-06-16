@@ -237,6 +237,12 @@ const ShuttleAPI = {
         },
         deleteTeam(team_id) {
             return ShuttleAPI.post('/api/admin/teams/delete', { team_id }, { admin: true });
+        },
+        getTeamPlayers(team_id) {
+            return ShuttleAPI.get(`/api/admin/team-players?team_id=${team_id}`, true);
+        },
+        deleteTeamPlayer(player_id) {
+            return ShuttleAPI.post('/api/admin/team-players/delete', { player_id }, { admin: true });
         }
     }
 };

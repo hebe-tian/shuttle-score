@@ -3,7 +3,7 @@ import jwt
 import time
 from extensions import db
 from models.user import User
-from models.player import Player
+from models.single_player import SinglePlayer
 from utils.response import success, bad_request, conflict, unauthorized, not_found
 from utils.validators import validate_account, validate_password, validate_username
 from utils.auth_decorator import token_required
@@ -81,7 +81,7 @@ def register():
             except (ValueError, TypeError):
                 return bad_request("邀请参数无效")
 
-            invite_player = Player.query.filter_by(id=invite, deleted=0).first()
+            invite_player = SinglePlayer.query.filter_by(id=invite, deleted=0).first()
             if not invite_player:
                 return bad_request("邀请链接无效")
             if invite_player.user_id:
@@ -103,7 +103,7 @@ def register():
         db.session.add(user)
         db.session.flush()
 
-        player = Player(
+        player = SinglePlayer(
             name=username,
             gender=gender,
             created_by=user.id,
@@ -183,7 +183,7 @@ def update_profile():
         user.updated_at = int(time.time())
 
         # 同步更新联动选手的名称
-        linked_player = Player.query.filter_by(user_id=user.id, created_by=user.id, deleted=0).first()
+        linked_player = SinglePlayer.query.filter_by(user_id=user.id, created_by=user.id, deleted=0).first()
         if linked_player:
             linked_player.name = username
 
