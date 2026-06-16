@@ -1,7 +1,8 @@
 from flask import Blueprint, request
 from extensions import db
-from models.match import Match, MatchPlayer, MatchScore
-from models.player import Player
+from models.match import Match, MatchPlayer, MatchScore, SingleMatchPlayer, TeamMatchPlayer
+from models.single_player import SinglePlayer
+from models.team_player import TeamPlayer
 from models.team import Team, TeamMember
 from utils.response import success, bad_request, not_found
 from utils.validators import (
@@ -41,6 +42,57 @@ def _check_match_access(user, match):
     return None
 
 
+def _get_match_players(match_id, team_id):
+    """获取比赛的选手关联列表"""
+    if team_id:
+        return TeamMatchPlayer.query.filter_by(match_id=match_id).all()
+    else:
+        return SingleMatchPlayer.query.filter_by(match_id=match_id).all()
+
+
+def _get_player_by_id(player_id, team_id):
+    """根据 team_id 从对应表获取选手"""
+    if team_id:
+        return TeamPlayer.query.filter_by(id=player_id, deleted=0).first()
+    else:
+        return SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
+
+
+def _validate_players(player_ids, team_id, user):
+    """验证选手列表，返回 (players, error_response)"""
+    if team_id:
+        players = TeamPlayer.query.filter(TeamPlayer.id.in_(player_ids), TeamPlayer.team_id == team_id, TeamPlayer.deleted == 0).all()
+    else:
+        players = SinglePlayer.query.filter(SinglePlayer.id.in_(player_ids), SinglePlayer.created_by == user.id, SinglePlayer.deleted == 0).all()
+    if len(players) != len(player_ids):
+        return None, bad_request("选手不存在或不属于当前用户")
+    return players, None
+
+
+def _create_match_player(match_id, player_id, side, team_id):
+    """创建比赛选手关联记录"""
+    if team_id:
+        return TeamMatchPlayer(match_id=match_id, player_id=player_id, side=side, is_winner=0)
+    else:
+        return SingleMatchPlayer(match_id=match_id, player_id=player_id, side=side, is_winner=0)
+
+
+def _update_winner(match_id, winner_side, team_id):
+    """更新胜方"""
+    if team_id:
+        TeamMatchPlayer.query.filter_by(match_id=match_id, side=winner_side).update({'is_winner': 1})
+    else:
+        SingleMatchPlayer.query.filter_by(match_id=match_id, side=winner_side).update({'is_winner': 1})
+
+
+def _delete_match_players(match_id, team_id):
+    """删除比赛选手关联记录"""
+    if team_id:
+        TeamMatchPlayer.query.filter_by(match_id=match_id).delete()
+    else:
+        SingleMatchPlayer.query.filter_by(match_id=match_id).delete()
+
+
 @matches_bp.route('', methods=['POST'])
 @token_required
 def create_match():
@@ -76,20 +128,17 @@ def create_match():
             return bad_request("每队至少需要1名选手")
 
         player_ids = [p.get('player_id') for p in players_data]
-        team_map = {p.get('player_id'): p.get('team') for p in players_data}
+        side_map = {p.get('player_id'): p.get('team') for p in players_data}
 
-        if None in player_ids or None in team_map.values():
+        if None in player_ids or None in side_map.values():
             return bad_request("选手数据格式错误")
 
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        if team_id:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == team_id, Player.deleted == 0).all()
-        else:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-        if len(players) != len(player_ids):
-            return bad_request("选手不存在或不属于当前用户")
+        players, err = _validate_players(player_ids, team_id, user)
+        if err:
+            return err
     else:
         # 常规比赛：使用 player_ids 格式
         player_ids = data.get('player_ids', [])
@@ -101,12 +150,9 @@ def create_match():
         if len(player_ids) != expected_count:
             return bad_request(f"{match_type}需要{expected_count}名选手")
 
-        if team_id:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == team_id, Player.deleted == 0).all()
-        else:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-        if len(players) != len(player_ids):
-            return bad_request("选手不存在或不属于当前用户")
+        players, err = _validate_players(player_ids, team_id, user)
+        if err:
+            return err
 
         player_map = {p.id: p for p in players}
 
@@ -120,16 +166,19 @@ def create_match():
 
     # 个人比赛必须包含本人绑定的选手
     if not team_id:
-        bound_player = Player.query.filter_by(
-            created_by=user.id, deleted=0, team_id=None
+        bound_player = SinglePlayer.query.filter_by(
+            user_id=user.id, created_by=user.id, deleted=0
         ).first()
-        if bound_player:
-            if is_unlimited:
-                participant_ids = player_ids
-            else:
-                participant_ids = player_ids
-            if bound_player.id not in participant_ids:
-                return bad_request("个人比赛必须包含本人绑定的选手")
+        if not bound_player:
+            bound_player = SinglePlayer.query.filter_by(
+                created_by=user.id, deleted=0, name=user.username, gender=user.gender
+            ).first()
+        if not bound_player:
+            bound_player = SinglePlayer.query.filter_by(
+                created_by=user.id, deleted=0
+            ).first()
+        if bound_player and bound_player.id not in player_ids:
+            return bad_request("个人比赛必须包含本人绑定的选手")
 
     if not scores_data:
         return bad_request("比分数据不能为空")
@@ -158,24 +207,14 @@ def create_match():
 
         if is_unlimited:
             for pid in player_ids:
-                mp = MatchPlayer(
-                    match_id=match.id,
-                    player_id=pid,
-                    team=team_map[pid],
-                    is_winner=0
-                )
+                mp = _create_match_player(match.id, pid, side_map[pid], team_id)
                 db.session.add(mp)
         else:
             category = MATCH_TYPE_CATEGORY[match_type]
             team_size = 1 if category == 'singles' else 2
             for i, pid in enumerate(player_ids):
-                team = 1 if i < team_size else 2
-                mp = MatchPlayer(
-                    match_id=match.id,
-                    player_id=pid,
-                    team=team,
-                    is_winner=0
-                )
+                side = 1 if i < team_size else 2
+                mp = _create_match_player(match.id, pid, side, team_id)
                 db.session.add(mp)
 
         t1_score = s['team1_score']
@@ -187,7 +226,7 @@ def create_match():
             winner_team = 2
 
         if winner_team > 0:
-            MatchPlayer.query.filter_by(match_id=match.id, team=winner_team).update({'is_winner': 1})
+            _update_winner(match.id, winner_team, team_id)
 
         score = MatchScore(
             match_id=match.id,
@@ -253,17 +292,17 @@ def query_matches():
     member_name = data.get('member_name', '').strip()
     if member_name:
         if team_id:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.team_id == team_id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = TeamMatchPlayer.query.join(TeamPlayer).filter(
+                TeamPlayer.name.contains(member_name),
+                TeamPlayer.team_id == team_id,
+                TeamPlayer.deleted == 0
+            ).with_entities(TeamMatchPlayer.match_id).subquery()
         else:
-            subquery = MatchPlayer.query.join(Player).filter(
-                Player.name.contains(member_name),
-                Player.created_by == user.id,
-                Player.deleted == 0
-            ).with_entities(MatchPlayer.match_id).subquery()
+            subquery = SingleMatchPlayer.query.join(SinglePlayer).filter(
+                SinglePlayer.name.contains(member_name),
+                SinglePlayer.created_by == user.id,
+                SinglePlayer.deleted == 0
+            ).with_entities(SingleMatchPlayer.match_id).subquery()
         query = query.filter(Match.id.in_(db.session.query(subquery.c.match_id)))
 
     total = query.count()
@@ -334,20 +373,17 @@ def update_match():
             return bad_request("每队至少需要1名选手")
 
         player_ids = [p.get('player_id') for p in players_data]
-        team_map = {p.get('player_id'): p.get('team') for p in players_data}
+        side_map = {p.get('player_id'): p.get('team') for p in players_data}
 
-        if None in player_ids or None in team_map.values():
+        if None in player_ids or None in side_map.values():
             return bad_request("选手数据格式错误")
 
         if len(set(player_ids)) != len(player_ids):
             return bad_request("同一比赛中选手不可重复选择")
 
-        if match_team_id:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == match_team_id, Player.deleted == 0).all()
-        else:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-        if len(players) != len(player_ids):
-            return bad_request("选手不存在或不属于当前用户")
+        players, err = _validate_players(player_ids, match_team_id, user)
+        if err:
+            return err
     else:
         # 常规比赛：使用 player_ids 格式
         player_ids = data.get('player_ids', [])
@@ -359,12 +395,9 @@ def update_match():
         if len(player_ids) != expected_count:
             return bad_request(f"{match_type}需要{expected_count}名选手")
 
-        if match_team_id:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.team_id == match_team_id, Player.deleted == 0).all()
-        else:
-            players = Player.query.filter(Player.id.in_(player_ids), Player.created_by == user.id, Player.deleted == 0).all()
-        if len(players) != len(player_ids):
-            return bad_request("选手不存在或不属于当前用户")
+        players, err = _validate_players(player_ids, match_team_id, user)
+        if err:
+            return err
 
         player_map = {p.id: p for p in players}
 
@@ -388,30 +421,20 @@ def update_match():
             return bad_request(f"队伍2得分错误: {msg2}")
 
     # 删除旧的选手和比分记录
-    MatchPlayer.query.filter_by(match_id=match.id).delete()
+    _delete_match_players(match.id, match_team_id)
     MatchScore.query.filter_by(match_id=match.id).delete()
 
     # 重新创建选手记录
     if is_unlimited:
         for pid in player_ids:
-            mp = MatchPlayer(
-                match_id=match.id,
-                player_id=pid,
-                team=team_map[pid],
-                is_winner=0
-            )
+            mp = _create_match_player(match.id, pid, side_map[pid], match_team_id)
             db.session.add(mp)
     else:
         category = MATCH_TYPE_CATEGORY[match_type]
         team_size = 1 if category == 'singles' else 2
         for i, pid in enumerate(player_ids):
-            team = 1 if i < team_size else 2
-            mp = MatchPlayer(
-                match_id=match.id,
-                player_id=pid,
-                team=team,
-                is_winner=0
-            )
+            side = 1 if i < team_size else 2
+            mp = _create_match_player(match.id, pid, side, match_team_id)
             db.session.add(mp)
 
     # 重新创建比分记录并计算胜负
@@ -425,7 +448,7 @@ def update_match():
             winner_team = 2
 
         if winner_team > 0:
-            MatchPlayer.query.filter_by(match_id=match.id, team=winner_team).update({'is_winner': 1})
+            _update_winner(match.id, winner_team, match_team_id)
 
         score = MatchScore(
             match_id=match.id,

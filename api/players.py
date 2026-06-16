@@ -1,6 +1,6 @@
 from flask import Blueprint, request
 from extensions import db
-from models.player import Player
+from models.single_player import SinglePlayer
 from models.user import User
 from utils.response import success, bad_request, conflict, not_found, forbidden
 from utils.validators import validate_player_name, validate_gender
@@ -26,12 +26,12 @@ def add_player():
     if not ok:
         return bad_request(msg)
 
-    existing = Player.query.filter_by(name=name, gender=gender, created_by=user.id, deleted=0).first()
+    existing = SinglePlayer.query.filter_by(name=name, gender=gender, created_by=user.id, deleted=0).first()
     if existing:
         return conflict("同性别下已存在同名选手")
 
     now = int(time.time())
-    player = Player(
+    player = SinglePlayer(
         name=name,
         gender=gender,
         created_by=user.id,
@@ -49,13 +49,13 @@ def get_players():
     user = request.current_user
     gender = request.args.get('gender', '')
 
-    query = Player.query.filter_by(created_by=user.id, deleted=0)
+    query = SinglePlayer.query.filter_by(created_by=user.id, deleted=0)
     if gender:
         ok, msg = validate_gender(gender)
         if ok:
             query = query.filter_by(gender=gender)
 
-    players = query.order_by(Player.created_at.desc()).all()
+    players = query.order_by(SinglePlayer.created_at.desc()).all()
     return success([p.to_dict() for p in players])
 
 
@@ -69,7 +69,7 @@ def update_player():
     if not player_id:
         return bad_request("缺少选手ID")
 
-    player = Player.query.filter_by(id=player_id, deleted=0).first()
+    player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
     if not player:
         return not_found("选手不存在")
 
@@ -90,7 +90,7 @@ def update_player():
             return bad_request(msg)
 
         if name != player.name:
-            existing = Player.query.filter_by(
+            existing = SinglePlayer.query.filter_by(
                 name=name, gender=player.gender, created_by=user.id, deleted=0
             ).first()
             if existing:
@@ -115,7 +115,7 @@ def update_player():
             if bind_user_id == user.id:
                 return bad_request("不能绑定自己")
 
-            duplicate = Player.query.filter_by(
+            duplicate = SinglePlayer.query.filter_by(
                 created_by=user.id, user_id=bind_user_id, deleted=0
             ).first()
             if duplicate and duplicate.id != player.id:
@@ -139,7 +139,7 @@ def update_player():
             if target_user.id == user.id:
                 return bad_request("不能绑定自己")
 
-            duplicate = Player.query.filter_by(
+            duplicate = SinglePlayer.query.filter_by(
                 created_by=user.id, user_id=target_user.id, deleted=0
             ).first()
             if duplicate and duplicate.id != player.id:
@@ -165,7 +165,7 @@ def delete_player():
     if not player_id:
         return bad_request("缺少选手ID")
 
-    player = Player.query.filter_by(id=player_id, deleted=0).first()
+    player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
     if not player:
         return not_found("选手不存在")
 
@@ -191,7 +191,7 @@ def unbind_player():
     if not player_id:
         return bad_request("缺少选手ID")
 
-    player = Player.query.filter_by(id=player_id, deleted=0).first()
+    player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
     if not player:
         return not_found("选手不存在")
 
@@ -217,7 +217,7 @@ def invite_player():
     if not player_id:
         return bad_request("缺少选手ID")
 
-    player = Player.query.filter_by(id=player_id, deleted=0).first()
+    player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
     if not player:
         return not_found("选手不存在")
 
@@ -247,7 +247,7 @@ def get_bind_user():
     if not player_id:
         return bad_request("缺少选手ID")
 
-    player = Player.query.filter_by(id=player_id, deleted=0).first()
+    player = SinglePlayer.query.filter_by(id=player_id, deleted=0).first()
     if not player:
         return not_found("选手不存在")
 

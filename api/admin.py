@@ -1,8 +1,9 @@
 from flask import Blueprint, request, current_app
 from extensions import db
 from models.user import User, Admin
-from models.match import Match, MatchPlayer, MatchScore
-from models.player import Player
+from models.match import Match, MatchScore, SingleMatchPlayer, TeamMatchPlayer
+from models.single_player import SinglePlayer
+from models.team_player import TeamPlayer
 from models.setting import Setting
 from models.team import Team, TeamMember
 from utils.response import success, bad_request, conflict, not_found, forbidden
@@ -251,7 +252,10 @@ def admin_delete_match():
         return not_found("比赛记录不存在")
 
     MatchScore.query.filter_by(match_id=match_id).delete()
-    MatchPlayer.query.filter_by(match_id=match_id).delete()
+    if match.team_id:
+        TeamMatchPlayer.query.filter_by(match_id=match_id).delete()
+    else:
+        SingleMatchPlayer.query.filter_by(match_id=match_id).delete()
     db.session.delete(match)
     db.session.commit()
 
@@ -264,9 +268,9 @@ def admin_get_players():
     page = validate_page(request.args.get('page', 1))
     page_size = validate_page_size(request.args.get('page_size', 20))
 
-    query = Player.query.filter_by(deleted=0)
+    query = SinglePlayer.query.filter_by(deleted=0)
     total = query.count()
-    players = query.order_by(Player.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    players = query.order_by(SinglePlayer.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
 
     result = []
     for p in players:
@@ -293,7 +297,7 @@ def admin_update_player():
     if not player_id:
         return bad_request("选手ID不能为空")
 
-    player = Player.query.get(player_id)
+    player = SinglePlayer.query.get(player_id)
     if not player:
         return not_found("选手不存在")
 
@@ -323,11 +327,11 @@ def admin_delete_player():
     if not player_id:
         return bad_request("选手ID不能为空")
 
-    player = Player.query.get(player_id)
+    player = SinglePlayer.query.get(player_id)
     if not player:
         return not_found("选手不存在")
 
-    match_player_refs = MatchPlayer.query.filter_by(player_id=player_id).all()
+    match_player_refs = SingleMatchPlayer.query.filter_by(player_id=player_id).all()
     if match_player_refs:
         return bad_request("该选手存在关联比赛记录，无法删除")
 
@@ -394,7 +398,7 @@ def admin_get_teams():
     for team in teams:
         creator = User.query.get(team.creator_id)
         member_count = TeamMember.query.filter_by(team_id=team.id).count()
-        player_count = Player.query.filter_by(team_id=team.id, deleted=0).count()
+        player_count = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).count()
         match_count = Match.query.filter_by(team_id=team.id, deleted=0).count()
 
         items.append({
@@ -435,7 +439,7 @@ def admin_get_team(team_id):
         "joined_at": m.joined_at
     } for m in members]
 
-    players = Player.query.filter_by(team_id=team.id, deleted=0).all()
+    players = TeamPlayer.query.filter_by(team_id=team.id, deleted=0).all()
     player_list = []
     for p in players:
         d = p.to_dict()
@@ -477,8 +481,54 @@ def admin_delete_team():
 
     team.deleted = 1
 
-    Player.query.filter_by(team_id=team.id, deleted=0).update({'deleted': 1})
+    TeamPlayer.query.filter_by(team_id=team.id, deleted=0).update({'deleted': 1})
 
     db.session.commit()
 
     return success({"message": "团队已解散"})
+
+
+@admin_bp.route('/team-players', methods=['GET'])
+@admin_token_required
+def admin_get_team_players():
+    team_id = request.args.get('team_id')
+    if not team_id:
+        return bad_request("团队ID不能为空")
+
+    team = Team.query.get(team_id)
+    if not team:
+        return not_found("团队不存在")
+
+    players = TeamPlayer.query.filter_by(team_id=team_id, deleted=0).all()
+    result = []
+    for p in players:
+        d = p.to_dict()
+        bound_user = User.query.get(p.user_id) if p.user_id else None
+        d["bound_username"] = bound_user.username if bound_user else None
+        result.append(d)
+
+    return success(result)
+
+
+@admin_bp.route('/team-players/delete', methods=['POST'])
+@admin_token_required
+def admin_delete_team_player():
+    data = request.get_json(silent=True) or {}
+    player_id = data.get('player_id')
+
+    if not player_id:
+        return bad_request("选手ID不能为空")
+
+    player = TeamPlayer.query.get(player_id)
+    if not player:
+        return not_found("选手不存在")
+
+    # 检查是否有关联比赛
+    match_player_refs = TeamMatchPlayer.query.filter_by(player_id=player_id).all()
+    if match_player_refs:
+        return bad_request("该选手存在关联比赛记录，无法删除")
+
+    player.deleted = 1
+    db.session.commit()
+
+    return success({"message": "选手已删除"})

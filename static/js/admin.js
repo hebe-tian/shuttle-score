@@ -476,7 +476,7 @@ const ShuttleAdmin = {
                 playerEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon"></div><div class="empty-state-text">暂无选手</div></div>';
             } else {
                 playerEl.innerHTML = `<table class="data-table">
-                    <thead><tr><th>ID</th><th>名称</th><th>性别</th><th>绑定用户</th><th>角色</th><th>创建时间</th></tr></thead>
+                    <thead><tr><th>ID</th><th>名称</th><th>性别</th><th>绑定用户</th><th>角色</th><th>创建时间</th><th>操作</th></tr></thead>
                     <tbody>${players.map(p => `
                         <tr>
                             <td>${p.id}</td>
@@ -485,6 +485,7 @@ const ShuttleAdmin = {
                             <td>${p.bound_username || '-'}</td>
                             <td>${p.role === 'admin' ? '管理员' : '成员'}</td>
                             <td>${ShuttleNav.formatDate(p.created_at)}</td>
+                            <td><span class="action-link action-link-danger" onclick="ShuttleAdmin.deleteTeamPlayer(${p.id})">删除</span></td>
                         </tr>
                     `).join('')}</tbody>
                 </table>`;
@@ -506,5 +507,16 @@ const ShuttleAdmin = {
                 ShuttleNav.showToast(res.msg || '解散失败', 'error');
             }
         });
+    },
+
+    async deleteTeamPlayer(playerId) {
+        if (!confirm('确定要删除该团队选手吗？')) return;
+        const res = await ShuttleAPI.admin.deleteTeamPlayer(playerId);
+        if (res.ok) {
+            ShuttleNav.showToast('选手已删除');
+            this.loadTeamDetail(this._currentTeamId);
+        } else {
+            ShuttleNav.showToast(res.msg || '删除失败', 'error');
+        }
     }
 };
