@@ -1,0 +1,110 @@
+{% extends "front_base.html" %}
+
+{% block title %}个人中心 - Shuttle Score{% endblock %}
+
+{% block content %}
+<h2 style="font-family:var(--font-title);color:var(--text-primary);margin-bottom:16px;letter-spacing:-0.02em;">个人中心</h2>
+
+<div class="card">
+    <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:48px;"></div>
+        <div id="profile-username" style="font-size:18px;font-weight:700;color:var(--text-primary);margin-top:8px;"></div>
+        <div id="profile-account" style="font-size:13px;color:var(--text-muted);margin-top:4px;"></div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 style="font-size:15px;color:var(--text-primary);margin-bottom:12px;font-weight:600;">修改用户名</h3>
+    <form id="update-username-form">
+        <div class="form-group">
+            <label class="form-label">新用户名</label>
+            <input type="text" id="new-username" class="form-input" placeholder="2-8位" required>
+        </div>
+        <div id="username-error" class="form-error"></div>
+        <button type="submit" class="btn btn-primary btn-sm">保存</button>
+    </form>
+</div>
+
+<div class="card">
+    <h3 style="font-size:15px;color:var(--text-primary);margin-bottom:12px;font-weight:600;">修改密码</h3>
+    <form id="update-password-form">
+        <div class="form-group">
+            <label class="form-label">旧密码</label>
+            <input type="password" id="old-password" class="form-input" placeholder="输入旧密码" autocomplete="current-password" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">新密码</label>
+            <input type="password" id="new-password" class="form-input" placeholder="6-20位" autocomplete="new-password" required>
+        </div>
+        <div id="password-error" class="form-error"></div>
+        <button type="submit" class="btn btn-primary btn-sm">修改密码</button>
+    </form>
+</div>
+
+<div style="margin-top:16px;">
+    <button class="btn btn-outline btn-block" onclick="ShuttleAuth.logout()">退出登录</button>
+</div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+
+ShuttleNav.renderAll('me', 'me');
+
+async function loadProfile() {
+    const res = await ShuttleAPI.auth.getProfile();
+    if (res.ok) {
+        const u = res.data;
+        document.getElementById('profile-username').textContent = u.username;
+        document.getElementById('profile-account').textContent = '账号: ' + u.account;
+        ShuttleAuth.saveUser(u);
+    }
+}
+
+loadProfile();
+
+document.getElementById('update-username-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('username-error');
+    errorEl.textContent = '';
+
+    const username = document.getElementById('new-username').value.trim();
+    if (!username) {
+        errorEl.textContent = '请输入用户名';
+        return;
+    }
+
+    const res = await ShuttleAPI.auth.updateUsername(username);
+    if (res.ok) {
+        ShuttleNav.showToast('用户名修改成功');
+        ShuttleAuth.saveUser(res.data);
+        document.getElementById('profile-username').textContent = res.data.username;
+        document.getElementById('new-username').value = '';
+    } else {
+        errorEl.textContent = res.msg || '修改失败';
+    }
+});
+
+document.getElementById('update-password-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('password-error');
+    errorEl.textContent = '';
+
+    const old_password = document.getElementById('old-password').value;
+    const new_password = document.getElementById('new-password').value;
+
+    if (!old_password || !new_password) {
+        errorEl.textContent = '请填写旧密码和新密码';
+        return;
+    }
+
+    const res = await ShuttleAPI.auth.updatePassword(old_password, new_password);
+    if (res.ok) {
+        ShuttleNav.showToast('密码修改成功');
+        document.getElementById('old-password').value = '';
+        document.getElementById('new-password').value = '';
+    } else {
+        errorEl.textContent = res.msg || '修改失败';
+    }
+});
+{% endblock %}

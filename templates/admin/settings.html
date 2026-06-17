@@ -1,0 +1,27 @@
+{% extends "admin_base.html" %}
+
+{% block title %}系统设置 - Shuttle Score{% endblock %}
+
+{% block page_title %}系统设置{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="form-group">
+        <label class="form-label">GitHub Issue 链接</label>
+        <input type="url" id="setting-github-url" class="form-input" placeholder="https://github.com/your-repo/issues">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">首页联系方式中展示的 GitHub Issue 页面链接</div>
+    </div>
+    <div class="form-group">
+        <label class="form-label">联系邮箱</label>
+        <input type="email" id="setting-contact-email" class="form-input" placeholder="your-email@example.com">
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">首页联系方式中展示的邮箱地址</div>
+    </div>
+    <button class="btn btn-primary" onclick="ShuttleAdmin.saveSettings()">保存设置</button>
+</div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+ShuttleAdmin.loadSettings();
+{% endblock %}

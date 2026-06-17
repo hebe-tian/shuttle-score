@@ -1,0 +1,78 @@
+{% extends "front_base.html" %}
+
+{% block title %}登录 - Shuttle Score{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tab-bar { display: none !important; }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="auth-card">
+    <div class="auth-title">登录</div>
+    <form id="login-form">
+        <div class="form-group">
+            <label class="form-label">账号</label>
+            <input type="text" id="login-account" class="form-input" placeholder="请输入账号" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">密码</label>
+            <input type="password" id="login-password" class="form-input" placeholder="请输入密码" autocomplete="current-password" required>
+        </div>
+        <div id="login-error" class="form-error" style="margin-bottom:12px;"></div>
+        <button type="submit" class="btn btn-primary btn-block" id="login-btn">登录</button>
+    </form>
+    <div class="auth-footer">
+        还没有账号？<a href="/pages/register.html">立即注册</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_script %}
+ShuttleNav.renderNavBar('');
+ShuttleNav.renderHelpButton();
+
+if (ShuttleAuth.isLoggedIn()) {
+    window.location.href = '/pages/myhomepage.html';
+}
+
+const loginReason = sessionStorage.getItem('login_reason');
+if (loginReason) {
+    document.getElementById('login-error').textContent = loginReason;
+    document.getElementById('login-error').style.color = 'var(--primary)';
+    sessionStorage.removeItem('login_reason');
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById('login-error');
+    errorEl.textContent = '';
+    const btn = document.getElementById('login-btn');
+
+    const account = document.getElementById('login-account').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!account || !password) {
+        errorEl.textContent = '请输入账号和密码';
+        return;
+    }
+
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+
+    const res = await ShuttleAPI.auth.login(account, password);
+    btn.classList.remove('btn-loading');
+    btn.disabled = false;
+
+    if (res.ok) {
+        ShuttleAuth.saveToken(res.data.token);
+        ShuttleAuth.saveUser(res.data.user);
+        const redirect = sessionStorage.getItem('redirect_after_login') || '/pages/myhomepage.html';
+        sessionStorage.removeItem('redirect_after_login');
+        window.location.href = redirect;
+    } else {
+        errorEl.textContent = res.msg || '登录失败';
+    }
+});
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "front_base.html" %}
+
+{% block title %}比赛查询 - Shuttle Score{% endblock %}
+
+{% block extra_css %}
+<style>
+    .query-filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    @media (max-width: 767px) {
+        .query-filters {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h2 style="font-family:var(--font-title);color:var(--text-primary);margin:0;letter-spacing:-0.02em;">比赛查询</h2>
+    <a href="/pages/matches.html" class="btn btn-outline btn-sm">录入比赛</a>
+</div>
+
+<div class="card">
+    <form id="query-form">
+        <div class="query-filters">
+            <div class="form-group">
+                <label class="form-label">比赛类型</label>
+                <select id="query-type" class="form-select">
+                    <option value="">全部</option>
+                    <option value="singles">单打</option>
+                    <option value="doubles">双打</option>
+                    <option value="ms">男单</option>
+                    <option value="ws">女单</option>
+                    <option value="os">无限制单打</option>
+                    <option value="md">男双</option>
+                    <option value="wd">女双</option>
+                    <option value="xd">混双</option>
+                    <option value="od">无限制双打</option>
+                    <option value="unlimited">无限制比赛</option>
+                    <option value="fs">无限制比赛(单打场)</option>
+                    <option value="fd">无限制比赛(双打场)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">选手名称</label>
+                <input type="text" id="query-member" class="form-input" placeholder="搜索选手">
+            </div>
+            <div class="form-group">
+                <label class="form-label">开始日期</label>
+                <input type="date" id="query-start" class="form-input" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label class="form-label">结束日期</label>
+                <input type="date" id="query-end" class="form-input" autocomplete="off">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">查询</button>
+    </form>
+</div>
+
+<div id="query-results"></div>
+<div id="query-pagination" class="pagination"></div>
+{% endblock %}
+
+{% block modals %}
+<div id="edit-modal" class="modal-overlay"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/js/matches.js"></script>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+
+ShuttleNav.renderAll('matches');
+
+ShuttleMatches.initQuery();
+{% endblock %}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>{% block title %}管理后台 - Shuttle Score{% endblock %}</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block layout %}
+    <div class="admin-layout">
+        <aside class="admin-sidebar">
+            <div class="admin-sidebar-brand">管理后台</div>
+            <a href="/admin/dashboard.html" class="admin-nav-item {{ 'active' if active_nav == 'dashboard' }}">仪表盘</a>
+            <a href="/admin/admins.html" class="admin-nav-item {{ 'active' if active_nav == 'admins' }}">管理员管理</a>
+            <a href="/admin/users.html" class="admin-nav-item {{ 'active' if active_nav == 'users' }}">用户管理</a>
+            <a href="/admin/matches.html" class="admin-nav-item {{ 'active' if active_nav == 'matches' }}">比赛管理</a>
+            <a href="/admin/players.html" class="admin-nav-item {{ 'active' if active_nav == 'players' }}">选手管理</a>
+            <a href="/admin/teams.html" class="admin-nav-item {{ 'active' if active_nav == 'teams' }}">团队管理</a>
+            <a href="/admin/settings.html" class="admin-nav-item {{ 'active' if active_nav == 'settings' }}">系统设置</a>
+            <a href="/admin/login.html" class="admin-nav-item" onclick="ShuttleAuth.adminLogout()" style="color:var(--error);">退出登录</a>
+        </aside>
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1 class="admin-title">{% block page_title %}{% endblock %}</h1>
+                {% block header_extra %}{% endblock %}
+            </div>
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% endblock %}
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    <script src="/js/admin.js"></script>
+    {% block extra_js %}{% endblock %}
+    <script>
+        {% block page_script %}{% endblock %}
+    </script>
+</body>
+</html>

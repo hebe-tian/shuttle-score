@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <title>{% block title %}Shuttle Score{% endblock %}</title>
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav id="nav-bar" class="nav-bar"></nav>
+
+    {% block main %}
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    {% endblock %}
+
+    {% block modals %}{% endblock %}
+
+    <div id="tab-bar" class="tab-bar"></div>
+
+    {% block footer %}{% endblock %}
+
+    <script src="/js/auth.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/nav.js"></script>
+    {% block extra_js %}{% endblock %}
+    <script>
+        {% block page_script %}{% endblock %}
+    </script>
+</body>
+</html>

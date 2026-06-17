@@ -1,0 +1,45 @@
+{% extends "admin_base.html" %}
+
+{% block title %}管理后台 - Shuttle Score{% endblock %}
+
+{% block page_title %}仪表盘{% endblock %}
+
+{% block header_extra %}
+<span id="admin-name" style="font-size:13px;color:var(--text-secondary);"></span>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px;">
+    <div class="card" style="text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:var(--primary);" id="stat-users">0</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">用户数</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:var(--match-ms);" id="stat-matches">0</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">比赛数</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:var(--match-xd);" id="stat-players">0</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">选手数</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:var(--match-od);" id="stat-admins">0</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">管理员数</div>
+    </div>
+    <div class="card" style="text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:var(--match-os);" id="stat-teams">0</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">团队数</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+const admin = ShuttleAuth.getAdmin();
+if (admin) {
+    document.getElementById('admin-name').textContent = admin.account;
+}
+
+ShuttleAdmin.loadDashboard();
+{% endblock %}
