@@ -1,0 +1,31 @@
+{% extends "admin_base.html" %}
+
+{% block title %}团队详情 - Shuttle Score{% endblock %}
+
+{% block page_title %}团队详情{% endblock %}
+
+{% block header_extra %}
+<a href="/admin/teams.html" class="btn btn-secondary btn-sm">返回列表</a>
+{% endblock %}
+
+{% block content %}
+<div id="team-info"></div>
+
+<h3 style="margin:16px 0 8px;">成员列表</h3>
+<div id="member-list"></div>
+
+<h3 style="margin:16px 0 8px;">选手列表</h3>
+<div id="player-list"></div>
+
+<div style="margin-top:24px;">
+    <button id="delete-team-btn" class="btn btn-danger" onclick="ShuttleAdmin.confirmDeleteTeam()">解散团队</button>
+</div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+const params = new URLSearchParams(window.location.search);
+const teamId = params.get('id');
+ShuttleAdmin.loadTeamDetail(teamId);
+{% endblock %}

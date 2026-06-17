@@ -1,0 +1,91 @@
+{% extends "front_base.html" %}
+
+{% block title %}团队 - Shuttle Score{% endblock %}
+
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h3 style="font-family:var(--font-title);color:var(--text-primary);font-weight:600;">团队</h3>
+    <div style="display:flex;gap:8px;">
+        <button id="btn-join-team" class="btn btn-outline btn-sm">加入团队</button>
+        <button id="btn-create-team" class="btn btn-primary btn-sm">创建团队</button>
+    </div>
+</div>
+
+<div id="team-list"></div>
+{% endblock %}
+
+{% block modals %}
+<!-- 创建团队弹窗 -->
+<div id="create-team-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-title">创建团队</div>
+        <form id="create-team-form">
+            <div class="form-group">
+                <label class="form-label">团队名称</label>
+                <input type="text" id="create-team-name" class="form-input" placeholder="输入团队名称" required>
+            </div>
+            <div id="create-team-error" class="form-error"></div>
+            <div class="modal-actions">
+                <button type="button" id="close-create-team" class="btn btn-outline btn-sm">取消</button>
+                <button type="submit" class="btn btn-primary btn-sm">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 加入团队弹窗 -->
+<div id="join-team-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-title">加入团队</div>
+
+        <!-- Step 1 -->
+        <div id="join-step1">
+            <div class="form-group">
+                <label class="form-label">团队名称</label>
+                <input type="text" id="join-team-name" class="form-input" placeholder="输入团队名称">
+            </div>
+            <div class="form-group">
+                <label class="form-label">邀请码</label>
+                <input type="text" id="join-invite-code" class="form-input" placeholder="输入邀请码">
+            </div>
+            <div id="join-step1-error" class="form-error"></div>
+            <div class="modal-actions">
+                <button type="button" id="close-join-team" class="btn btn-outline btn-sm">取消</button>
+                <button type="button" id="join-step1-next" class="btn btn-primary btn-sm">下一步</button>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div id="join-step2" style="display:none;">
+            <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px;">选择加入方式：</p>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <button type="button" id="join-action-create" class="btn btn-primary btn-block">创建新选手加入</button>
+                <button type="button" id="join-action-bind" class="btn btn-outline btn-block">绑定已有选手加入</button>
+            </div>
+            <div id="bind-player-area" style="display:none;margin-top:16px;">
+                <div class="form-group">
+                    <label class="form-label">选择选手</label>
+                    <select id="bind-player-select" class="form-select">
+                        <option value="">请选择</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" id="close-join-team2" class="btn btn-outline btn-sm">取消</button>
+                    <button type="button" id="join-bind-submit" class="btn btn-primary btn-sm">确认绑定</button>
+                </div>
+            </div>
+            <div id="join-step2-error" class="form-error"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/js/teams.js"></script>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+ShuttleNav.renderAll('teams');
+ShuttleTeams.init();
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "admin_base.html" %}
+
+{% block title %}用户管理 - Shuttle Score{% endblock %}
+
+{% block page_title %}用户管理{% endblock %}
+
+{% block content %}
+<div id="user-list"></div>
+<div id="user-pagination" class="pagination"></div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+ShuttleAdmin.loadUsers(1);
+{% endblock %}

@@ -1,0 +1,479 @@
+{% extends "front_base.html" %}
+
+{% block title %}团队详情 - Shuttle Score{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .team-header {
+        background: var(--white);
+        border-radius: var(--radius-card);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+    }
+    .team-name {
+        font-family: var(--font-title);
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+        margin-bottom: 12px;
+    }
+    .invite-code-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .invite-code-label {
+        font-size: 13px;
+        color: var(--text-secondary);
+        flex-shrink: 0;
+    }
+    .invite-code-box {
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
+        background: var(--primary-bg);
+        border: 1px solid var(--primary-lightest);
+        border-radius: var(--radius-input);
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .invite-code-value {
+        font-family: var(--font-score);
+        letter-spacing: 0.06em;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--primary-darker);
+        padding: 6px 12px;
+        user-select: all;
+    }
+    .invite-code-divider {
+        width: 1px;
+        height: 16px;
+        background: var(--primary-lightest);
+        flex-shrink: 0;
+    }
+    .invite-code-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--primary-darker);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        white-space: nowrap;
+        line-height: 1;
+    }
+    .invite-code-btn:hover {
+        background: var(--primary);
+        color: var(--white);
+    }
+    .invite-code-btn:active {
+        background: var(--primary-dark);
+    }
+    .invite-code-btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+    }
+    .member-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+    .member-tag {
+        padding: 4px 10px;
+        border-radius: var(--radius-pill);
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--primary-bg);
+        color: var(--primary-darker);
+    }
+    .member-tag.is-creator {
+        background: var(--primary);
+        color: var(--white);
+    }
+
+    .sub-tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 16px;
+        background: var(--white);
+        border-radius: var(--radius-card);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border);
+        overflow: hidden;
+    }
+    .sub-tab-btn {
+        flex: 1;
+        padding: 12px 0;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border: none;
+        background: var(--white);
+        transition: all 0.15s;
+        border-bottom: 2px solid transparent;
+    }
+    .sub-tab-btn:hover {
+        color: var(--primary);
+        background: var(--primary-bg);
+    }
+    .sub-tab-btn.active {
+        color: var(--primary);
+        font-weight: 600;
+        border-bottom-color: var(--primary);
+        background: var(--primary-bg);
+    }
+
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Players tab */
+    .player-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: var(--white);
+        border-radius: var(--radius-card);
+        margin-bottom: 8px;
+        border: 1px solid var(--border);
+        transition: box-shadow 0.2s;
+    }
+    .player-item:hover {
+        box-shadow: var(--shadow-md);
+    }
+    .player-item-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .player-item-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+    .player-item-name.bound {
+        color: var(--primary);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+    .player-item-gender {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    /* Stats tab */
+    .stats-section {
+        background: var(--white);
+        border-radius: var(--radius-card);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+    }
+    .section-title {
+        font-family: var(--font-title);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        letter-spacing: -0.01em;
+    }
+    .chart-filters {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .chart-filter-chip {
+        padding: 4px 12px;
+        border-radius: var(--radius-pill);
+        font-size: 12px;
+        cursor: pointer;
+        background: var(--primary-bg);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        transition: all 0.15s;
+        font-weight: 500;
+    }
+    .chart-filter-chip.active {
+        background: var(--primary);
+        color: var(--white);
+        border-color: var(--primary);
+        font-weight: 600;
+    }
+    .chart-filter-chip:hover:not(.active) {
+        border-color: var(--primary-light);
+        color: var(--primary);
+    }
+    .info-tip {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1.5px solid var(--text-muted);
+        color: var(--text-muted);
+        font-size: 10px;
+        font-weight: 700;
+        cursor: help;
+        flex-shrink: 0;
+        margin-left: 4px;
+        vertical-align: middle;
+    }
+    .info-tip:hover .info-tooltip,
+    .info-tip:focus .info-tooltip {
+        display: block;
+    }
+    .info-tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--text-primary);
+        color: var(--white);
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 1.5;
+        padding: 8px 12px;
+        border-radius: 6px;
+        white-space: nowrap;
+        z-index: 100;
+        pointer-events: none;
+    }
+    .info-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: var(--text-primary);
+    }
+    .chart-player-selector {
+        margin-bottom: 12px;
+    }
+    .chart-container {
+        position: relative;
+        height: 280px;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* Match recording inline */
+    .match-record-section {
+        background: var(--white);
+        border-radius: var(--radius-card);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+    }
+    .match-record-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+    .match-record-toggle h3 {
+        font-family: var(--font-title);
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+    .match-record-body {
+        margin-top: 16px;
+    }
+    .step-content {
+        display: none;
+    }
+
+    .leave-team-area {
+        margin-top: 24px;
+        text-align: center;
+    }
+
+    @media (max-width: 767px) {
+        .team-name {
+            font-size: 18px;
+        }
+        .chart-container {
+            height: 240px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="team-header" class="team-header"></div>
+
+<div class="sub-tabs">
+    <button class="sub-tab-btn active" data-tab="players" onclick="ShuttleTeamDetail.switchTab('players')">选手</button>
+    <button class="sub-tab-btn" data-tab="matches" onclick="ShuttleTeamDetail.switchTab('matches')">比赛</button>
+    <button class="sub-tab-btn" data-tab="stats" onclick="ShuttleTeamDetail.switchTab('stats')">统计</button>
+</div>
+
+<!-- Players Tab -->
+<div id="tab-players" class="tab-content active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-family:var(--font-title);color:var(--text-primary);font-weight:600;">选手列表</h3>
+        <button class="btn btn-primary btn-sm" onclick="ShuttleTeamDetail.openAddPlayerModal()">添加选手</button>
+    </div>
+    <div id="player-list"></div>
+</div>
+
+<!-- Matches Tab -->
+<div id="tab-matches" class="tab-content">
+    <div class="match-record-section">
+        <div class="match-record-toggle" onclick="ShuttleTeamDetail.toggleRecordSection()">
+            <h3>录入比赛</h3>
+            <span id="record-toggle-icon" style="font-size:18px;color:var(--text-muted);transition:transform 0.2s;">▼</span>
+        </div>
+        <div id="record-body" class="match-record-body" style="display:none;">
+            <div class="step-bar">
+                <span class="step-item active">1 类型</span>
+                <span class="step-item">2 选手</span>
+                <span class="step-item">3 比分</span>
+                <span class="step-item">4 确认</span>
+            </div>
+            <div id="step-summary" class="step-summary" style="display:none;"></div>
+            <div class="step-content" id="step-1">
+                <div class="form-label" style="margin-bottom:10px;">选择比赛类型</div>
+                <div class="type-grid">
+                    <div class="type-option" data-type="ms">男单</div>
+                    <div class="type-option" data-type="ws">女单</div>
+                    <div class="type-option" data-type="os">无限制单打</div>
+                    <div class="type-option" data-type="md">男双</div>
+                    <div class="type-option" data-type="wd">女双</div>
+                    <div class="type-option" data-type="xd">混双</div>
+                    <div class="type-option" data-type="od">无限制双打</div>
+                    <div class="type-option" data-type="fs">无限制比赛(单打场)</div>
+                    <div class="type-option" data-type="fd">无限制比赛(双打场)</div>
+                </div>
+            </div>
+            <div class="step-content" id="step-2">
+                <div id="player-select-area"></div>
+            </div>
+            <div class="step-content" id="step-3">
+                <div class="form-label" style="margin-bottom:10px;">输入比分</div>
+                <div id="score-input-area"></div>
+                <button type="button" id="add-game-btn" class="btn btn-outline btn-sm" style="margin-top:8px;">+ 添加一局</button>
+            </div>
+            <div class="step-content" id="step-4">
+                <div class="form-label" style="margin-bottom:10px;">确认比赛信息</div>
+                <div id="confirm-area"></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:16px;">
+                <button type="button" id="step-prev" class="btn btn-outline" style="display:none;">上一步</button>
+                <button type="button" id="step-next" class="btn btn-primary">下一步</button>
+                <button type="button" id="step-submit" class="btn btn-primary" style="display:none;">确认提交</button>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-family:var(--font-title);color:var(--text-primary);font-weight:600;">比赛记录</h3>
+    </div>
+    <div id="match-list"></div>
+    <div id="match-pagination" class="pagination"></div>
+</div>
+
+<!-- Stats Tab -->
+<div id="tab-stats" class="tab-content">
+    <div class="stats-section">
+        <div class="section-title">选手胜率排名</div>
+        <div class="chart-filters" id="team-winrate-filters"></div>
+        <div class="chart-container">
+            <canvas id="chart-team-winrate"></canvas>
+        </div>
+    </div>
+
+    <div class="stats-section">
+        <div class="section-title">对手胜率</div>
+        <div class="chart-player-selector">
+            <select id="opponent-player-select" class="form-select" style="max-width:240px;" onchange="ShuttleTeamDetail.loadOpponentWinRate()"></select>
+        </div>
+        <div class="chart-filters" id="opponent-winrate-filters"></div>
+        <div class="chart-container">
+            <canvas id="chart-opponent-winrate"></canvas>
+        </div>
+    </div>
+
+    <div class="stats-section">
+        <div class="section-title">搭档胜率</div>
+        <div class="chart-player-selector">
+            <select id="partner-player-select" class="form-select" style="max-width:240px;" onchange="ShuttleTeamDetail.loadPartnerWinRate()"></select>
+        </div>
+        <div class="chart-filters" id="partner-winrate-filters"></div>
+        <div class="chart-container">
+            <canvas id="chart-partner-winrate"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="leave-team-area" class="leave-team-area" style="display:none;">
+    <button class="btn btn-danger btn-sm" onclick="ShuttleTeamDetail.leaveTeam()">退出团队</button>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add Player Modal -->
+<div id="add-player-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-title">添加选手</div>
+        <form id="add-player-form">
+            <div class="form-group">
+                <label class="form-label">选手名称</label>
+                <input type="text" id="add-player-name" class="form-input" placeholder="2-20位" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">性别</label>
+                <select id="add-player-gender" class="form-select" required>
+                    <option value="">请选择</option>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick="ShuttleTeamDetail.closeAddPlayerModal()">取消</button>
+                <button type="submit" class="btn btn-primary btn-sm">添加</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Match Modal -->
+<div id="edit-modal" class="modal-overlay"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/js/matches.js"></script>
+<script src="/js/team-detail.js"></script>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireLogin()) throw new Error('Not logged in');
+ShuttleNav.renderAll('teams');
+ShuttleTeamDetail.init();
+{% endblock %}

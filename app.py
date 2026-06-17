@@ -1,5 +1,5 @@
 import os
-from flask import Flask
+from flask import Flask, render_template
 from extensions import db, migrate
 from config import config_map
 from crypto_utils import load_encrypted_config
@@ -40,15 +40,26 @@ def create_app():
 
     @app.route('/')
     def index():
-        return app.send_static_file('pages/index.html')
+        return render_template('index.html')
 
     @app.route('/pages/<path:filename>')
     def serve_pages(filename):
-        return app.send_static_file('pages/' + filename)
+        return render_template(filename)
 
     @app.route('/admin/<path:filename>')
     def serve_admin(filename):
-        return app.send_static_file('pages/admin/' + filename)
+        nav_map = {
+            'dashboard.html': 'dashboard',
+            'admins.html': 'admins',
+            'users.html': 'users',
+            'matches.html': 'matches',
+            'players.html': 'players',
+            'teams.html': 'teams',
+            'team-detail.html': 'teams',
+            'settings.html': 'settings',
+        }
+        active_nav = nav_map.get(filename, '')
+        return render_template(f'admin/{filename}', active_nav=active_nav)
 
     return app
 

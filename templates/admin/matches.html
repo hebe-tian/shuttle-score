@@ -1,0 +1,35 @@
+{% extends "admin_base.html" %}
+
+{% block title %}比赛管理 - Shuttle Score{% endblock %}
+
+{% block page_title %}比赛管理{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">比赛类型</label>
+            <select id="admin-match-type" class="form-select" style="width:auto;">
+                <option value="">全部</option>
+                <option value="ms">男单</option>
+                <option value="ws">女单</option>
+                <option value="os">无限制单打</option>
+                <option value="md">男双</option>
+                <option value="wd">女双</option>
+                <option value="xd">混双</option>
+                <option value="od">无限制双打</option>
+            </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="ShuttleAdmin.loadMatches(1)">筛选</button>
+    </div>
+</div>
+
+<div id="admin-match-list"></div>
+<div id="admin-match-pagination" class="pagination"></div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+ShuttleAdmin.loadMatches(1);
+{% endblock %}

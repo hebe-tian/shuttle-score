@@ -1,0 +1,16 @@
+{% extends "admin_base.html" %}
+
+{% block title %}选手管理 - Shuttle Score{% endblock %}
+
+{% block page_title %}选手管理{% endblock %}
+
+{% block content %}
+<div id="admin-player-list"></div>
+<div id="admin-player-pagination" class="pagination"></div>
+{% endblock %}
+
+{% block page_script %}
+if (!ShuttleAuth.requireAdmin()) throw new Error('Not admin');
+
+ShuttleAdmin.loadPlayers(1);
+{% endblock %}
