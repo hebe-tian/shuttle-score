@@ -54,6 +54,152 @@ const ShuttleNav = {
     renderAll(activePage, activeTab) {
         this.renderNavBar(activePage);
         this.renderTabBar(activeTab || activePage);
+        this.renderHelpButton();
+    },
+
+    renderHelpButton() {
+        if (document.getElementById('help-btn')) return;
+
+        // Create floating button
+        const btn = document.createElement('button');
+        btn.id = 'help-btn';
+        btn.className = 'help-btn';
+        btn.textContent = '?';
+        btn.addEventListener('click', () => this.openHelpModal());
+        document.body.appendChild(btn);
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.id = 'help-modal';
+        modal.className = 'modal-overlay help-modal';
+        modal.innerHTML = `
+            <div class="modal" style="position:relative;">
+                <button class="help-modal-close" id="help-modal-close">&times;</button>
+                <div class="modal-title">使用指南</div>
+
+                <div class="help-accordion">
+                    <div class="help-accordion-header" data-accordion="player">
+                        选手机制
+                        <span class="help-accordion-arrow">&#9660;</span>
+                    </div>
+                    <div class="help-accordion-body" data-accordion-body="player">
+                        <ul>
+                            <li>注册时自动创建同名同性别的选手</li>
+                            <li>可手动添加其他选手（输入名称+性别）</li>
+                            <li>选手与用户绑定后，名称显示下划线，点击可查看绑定信息</li>
+                            <li>选手可编辑名称、逻辑删除（已录入成绩不受影响）、解绑</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="help-accordion">
+                    <div class="help-accordion-header" data-accordion="invite">
+                        邀请机制
+                        <span class="help-accordion-arrow">&#9660;</span>
+                    </div>
+                    <div class="help-accordion-body" data-accordion-body="invite">
+                        <ul>
+                            <li>方式一：生成邀请链接（24小时有效），新用户通过链接注册后自动绑定该选手</li>
+                            <li>方式二：直接输入对方账号建立绑定</li>
+                            <li>绑定规则：不能绑定自己、同一用户不可重复绑定</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="help-accordion">
+                    <div class="help-accordion-header" data-accordion="team">
+                        团队机制
+                        <span class="help-accordion-arrow">&#9660;</span>
+                    </div>
+                    <div class="help-accordion-body" data-accordion-body="team">
+                        <ul>
+                            <li>创建团队：输入团队名称，创建者自动成为管理员</li>
+                            <li>加入团队：输入团队名称 + 邀请码，可选择"创建新选手加入"或"绑定已有选手加入"</li>
+                            <li>邀请码：创建团队时自动生成，仅创建者可刷新</li>
+                            <li>退出团队：创建者不可退出，其他成员可退出</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="help-accordion">
+                    <div class="help-accordion-header" data-accordion="issue">
+                        如何提 Issue
+                        <span class="help-accordion-arrow">&#9660;</span>
+                    </div>
+                    <div class="help-accordion-body" data-accordion-body="issue">
+                        <p style="margin-bottom:8px;">遇到问题或有建议？通过以下方式反馈：</p>
+                        <div class="help-issue-channels" id="help-issue-channels">
+                            <span class="help-no-channel">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Close handlers
+        document.getElementById('help-modal-close').addEventListener('click', () => this.closeHelpModal());
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) this.closeHelpModal();
+        });
+
+        // Accordion handlers
+        modal.querySelectorAll('.help-accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const key = header.getAttribute('data-accordion');
+                const body = modal.querySelector(`[data-accordion-body="${key}"]`);
+                const isActive = header.classList.contains('active');
+
+                // Close all
+                modal.querySelectorAll('.help-accordion-header').forEach(h => h.classList.remove('active'));
+                modal.querySelectorAll('.help-accordion-body').forEach(b => b.classList.remove('active'));
+
+                // Toggle current
+                if (!isActive) {
+                    header.classList.add('active');
+                    body.classList.add('active');
+                }
+            });
+        });
+    },
+
+    openHelpModal() {
+        const modal = document.getElementById('help-modal');
+        if (modal) {
+            modal.classList.add('active');
+            this.loadIssueChannels();
+        }
+    },
+
+    closeHelpModal() {
+        const modal = document.getElementById('help-modal');
+        if (modal) modal.classList.remove('active');
+    },
+
+    async loadIssueChannels() {
+        const container = document.getElementById('help-issue-channels');
+        if (!container) return;
+
+        try {
+            const res = await ShuttleAPI.settings.get();
+            const data = (res.ok && res.data) || {};
+            const githubUrl = data.github_issue_url || '';
+            const contactEmail = data.contact_email || '';
+
+            let html = '';
+            if (githubUrl) {
+                html += `<a href="${githubUrl}" target="_blank" rel="noopener" class="help-issue-link">GitHub Issues</a>`;
+            }
+            if (contactEmail) {
+                html += `<a href="mailto:${contactEmail}" class="help-issue-link">联系邮箱：${contactEmail}</a>`;
+            }
+            if (!html) {
+                html = '<span class="help-no-channel">暂未配置反馈渠道</span>';
+            }
+            container.innerHTML = html;
+        } catch {
+            container.innerHTML = '<span class="help-no-channel">暂未配置反馈渠道</span>';
+        }
     },
 
     showToast(msg, type = 'success') {

@@ -1072,3 +1072,161 @@
         margin-bottom: 60px;
     }
 }
+
+/* Help floating button */
+.help-btn {
+    position: fixed;
+    bottom: 32px;
+    right: 24px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--white);
+    font-size: 20px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-md);
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.2s, transform 0.2s;
+    line-height: 1;
+}
+
+.help-btn:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+@media (max-width: 767px) {
+    .help-btn {
+        bottom: 80px;
+        right: 16px;
+    }
+}
+
+/* Help modal */
+.help-modal .modal {
+    max-width: 560px;
+}
+
+.help-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary-bg);
+    color: var(--primary-darker);
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+
+.help-modal-close:hover {
+    background: var(--primary-lightest);
+}
+
+/* Accordion */
+.help-accordion {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.help-accordion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--primary-bg);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-darker);
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.help-accordion-header:hover {
+    background: var(--primary-lightest);
+}
+
+.help-accordion-arrow {
+    font-size: 12px;
+    transition: transform 0.2s;
+    color: var(--primary-darker);
+}
+
+.help-accordion-header.active .help-accordion-arrow {
+    transform: rotate(180deg);
+}
+
+.help-accordion-body {
+    display: none;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    background: var(--white);
+}
+
+.help-accordion-body.active {
+    display: block;
+}
+
+.help-accordion-body ul {
+    padding-left: 18px;
+    margin: 0;
+}
+
+.help-accordion-body li {
+    margin-bottom: 4px;
+}
+
+.help-accordion-body a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.help-issue-channels {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.help-issue-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--primary-bg);
+    border-radius: var(--radius-input);
+    color: var(--primary-darker);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+
+.help-issue-link:hover {
+    background: var(--primary-lightest);
+    color: var(--primary-darker);
+}
+
+.help-no-channel {
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+}

@@ -26,10 +26,15 @@ shuttle-score/
 │   ├── players.py          # 选手管理
 │   ├── matches.py          # 比赛录入/查询
 │   ├── stats.py            # 数据统计（胜率、得分）
+│   ├── teams.py            # 团队管理
+│   ├── settings.py         # 公共配置（GitHub Issue URL、联系邮箱）
 │   └── admin.py            # 管理后台 API
 ├── models/                 # 数据模型
 │   ├── user.py             # User / Admin 模型
 │   ├── player.py           # Player 模型（含 user_id 绑定字段）
+│   ├── single_player.py    # SinglePlayer 模型（个人赛选手）
+│   ├── team.py             # Team / TeamMember 模型
+│   ├── team_player.py      # TeamPlayer 模型（团队赛选手）
 │   └── match.py            # Match / MatchPlayer / MatchScore 模型
 ├── utils/                  # 工具模块
 │   ├── response.py         # 统一响应格式
@@ -46,9 +51,11 @@ shuttle-score/
     ├── js/
     │   ├── api.js          # API 请求封装
     │   ├── auth.js         # 认证状态管理
-    │   ├── nav.js          # 导航栏/TabBar/Toast/比赛卡片渲染
+    │   ├── nav.js          # 导航栏/TabBar/帮助按钮/Toast/比赛卡片渲染
     │   ├── players.js      # 选手管理页面逻辑
     │   ├── matches.js      # 比赛录入页面逻辑
+    │   ├── teams.js        # 团队管理页面逻辑
+    │   ├── team-detail.js  # 团队详情页面逻辑
     │   ├── stats.js        # 数据统计页面逻辑
     │   └── admin.js        # 管理后台页面逻辑
     ├── images/
@@ -60,6 +67,8 @@ shuttle-score/
         ├── myhomepage.html # 我的主页
         ├── matches.html    # 比赛录入
         ├── match-query.html# 比赛查询
+        ├── teams.html      # 团队列表
+        ├── team-detail.html# 团队详情
         ├── stats.html      # 数据统计
         ├── profile.html    # 个人设置
         └── admin/          # 管理后台页面
@@ -73,10 +82,13 @@ shuttle-score/
 |------|------|
 | 注册/登录 | 两步注册（账号密码 → 用户名性别），注册时自动创建同名选手，JWT 认证 |
 | 选手管理 | 添加选手（姓名+性别），按性别筛选；编辑名称、逻辑删除、绑定用户、邀请注册、解绑 |
+| 邀请注册 | 生成邀请链接（24小时有效），新用户通过链接注册后自动绑定该选手；也可直接输入对方账号绑定 |
 | 比赛录入 | 4 步流程：选类型 → 选选手 → 录比分 → 确认提交 |
 | 比赛查询 | 按类型/时间/选手筛选，分页浏览 |
+| 团队管理 | 创建团队、通过邀请码加入团队、团队内选手管理、退出团队 |
 | 数据统计 | 胜率柱状图 + 得分统计，支持按比赛类型筛选 |
 | 个人设置 | 修改用户名、修改密码 |
+| 使用指南 | 右下角 ? 按钮，查看选手机制、邀请机制、团队机制、如何提 Issue |
 
 ### 管理后台
 
@@ -129,6 +141,16 @@ shuttle-score/
 | `/api/matches/random` | GET | 随机比赛（首页） | 无 |
 | `/api/stats/win-rate` | POST | 胜率统计 | 用户 |
 | `/api/stats/score` | POST | 得分统计 | 用户 |
+| `/api/settings` | GET | 获取公共配置（GitHub Issue URL、联系邮箱） | 无 |
+| `/api/teams` | POST | 创建团队 | 用户 |
+| `/api/teams` | GET | 获取我的团队列表 | 用户 |
+| `/api/teams/resolve` | POST | 解析团队（验证名称+邀请码） | 用户 |
+| `/api/teams/<id>` | GET | 获取团队详情 | 用户 |
+| `/api/teams/<id>/join` | POST | 加入团队 | 用户 |
+| `/api/teams/<id>/leave` | POST | 退出团队 | 用户 |
+| `/api/teams/<id>/invite-code` | POST | 刷新邀请码 | 用户（创建者） |
+| `/api/teams/<id>/players` | POST | 添加团队选手 | 用户 |
+| `/api/teams/<id>/players` | GET | 获取团队选手列表 | 用户 |
 | `/api/admin/auth/login` | POST | 管理员登录 | 无 |
 | `/api/admin/admins` | GET/POST | 管理员列表/新增 | 超级管理员 |
 | `/api/admin/users` | GET | 用户列表 | 管理员 |
@@ -241,6 +263,54 @@ python3 app.py
 - 不能绑定自己
 - 已绑定选手名称显示下划线，点击可查看绑定用户信息
 - 支持解绑
+
+### Team / TeamMember / TeamPlayer 关系
+
+#### teams 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键，自增 |
+| name | TEXT | 团队名称 |
+| creator_id | INTEGER | 创建者用户 ID |
+| invite_code | TEXT | 邀请码（唯一） |
+| invite_expires_at | INTEGER | 邀请码过期时间戳（0=永不过期） |
+| deleted | INTEGER | 逻辑删除标记：0=正常，1=已删除 |
+| created_at | INTEGER | 创建时间（秒级时间戳） |
+
+#### team_members 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键，自增 |
+| team_id | INTEGER | 团队 ID |
+| user_id | INTEGER | 用户 ID |
+| joined_at | INTEGER | 加入时间（秒级时间戳） |
+
+联合唯一约束：`(team_id, user_id)`
+
+#### team_players 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键，自增 |
+| name | TEXT | 选手名称 |
+| gender | TEXT | 性别：male / female |
+| team_id | INTEGER | 团队 ID |
+| user_id | INTEGER | 绑定的用户 ID（可为 null） |
+| role | TEXT | 角色：admin / member |
+| deleted | INTEGER | 逻辑删除标记：0=正常，1=已删除 |
+| created_at | INTEGER | 创建时间（秒级时间戳） |
+
+#### Settings 表
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER | 主键，自增 |
+| key | TEXT | 配置键（唯一） |
+| value | TEXT | 配置值 |
+
+公开配置项：`github_issue_url`（GitHub Issues 链接）、`contact_email`（联系邮箱）
 
 ## 设计说明
 
