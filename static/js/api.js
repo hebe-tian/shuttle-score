@@ -76,6 +76,15 @@ const ShuttleAPI = {
         },
         updatePassword(old_password, new_password) {
             return ShuttleAPI.post('/api/auth/profile', { action: 'update_password', old_password, new_password });
+        },
+        forgotVerifyAccount(account) {
+            return ShuttleAPI.post('/api/auth/forgot-password/verify-account', { account });
+        },
+        forgotVerifyIdentity(account, verification) {
+            return ShuttleAPI.post('/api/auth/forgot-password/verify-identity', { account, verification });
+        },
+        forgotResetPassword(reset_token, new_password) {
+            return ShuttleAPI.post('/api/auth/forgot-password/reset', { reset_token, new_password });
         }
     },
 

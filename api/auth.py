@@ -1,9 +1,13 @@
 from flask import Blueprint, request, current_app
 import jwt
 import time
+import random
+from datetime import datetime
 from extensions import db
 from models.user import User
 from models.single_player import SinglePlayer
+from models.match import Match
+from models.team import Team, TeamMember
 from utils.response import success, bad_request, conflict, unauthorized, not_found
 from utils.validators import validate_account, validate_password, validate_username
 from utils.auth_decorator import token_required
@@ -210,3 +214,278 @@ def update_profile():
         return success({"message": "密码修改成功"})
 
     return bad_request("无效的操作类型")
+
+
+# ==================== 忘记密码 ====================
+
+# 简单的内存限流：{account: [timestamp, ...]}
+_forgot_password_attempts = {}
+
+
+def _check_rate_limit(account):
+    """检查24小时内忘记密码尝试次数，超过3次返回False"""
+    now = int(time.time())
+    cutoff = now - 86400
+    attempts = _forgot_password_attempts.get(account, [])
+    attempts = [t for t in attempts if t > cutoff]
+    _forgot_password_attempts[account] = attempts
+    return len(attempts) < 3
+
+
+def _record_attempt(account):
+    """记录一次忘记密码尝试"""
+    now = int(time.time())
+    if account not in _forgot_password_attempts:
+        _forgot_password_attempts[account] = []
+    _forgot_password_attempts[account].append(now)
+
+
+def _build_player_options(user):
+    """构造选手验证选择题，只取1条正确数据，无数据时也返回纯干扰项
+    排除注册时自动创建的选手（created_by == user_id）"""
+    user_players = SinglePlayer.query.filter(
+        SinglePlayer.created_by == user.id,
+        SinglePlayer.deleted == 0,
+        db.or_(SinglePlayer.user_id != user.id, SinglePlayer.user_id.is_(None))
+    ).all()
+
+    # 随机选1条正确答案
+    correct_name = random.choice([p.name for p in user_players]) if user_players else None
+
+    # 从其他用户的选手中选取干扰项
+    other_players = SinglePlayer.query.filter(
+        SinglePlayer.created_by != user.id,
+        SinglePlayer.deleted == 0
+    ).all()
+    other_names = list(set(p.name for p in other_players if p.name != correct_name))
+    random.shuffle(other_names)
+
+    # 凑够4个选项
+    distractor_count = min(len(other_names), 3)
+    distractors = other_names[:distractor_count]
+    if correct_name:
+        options = [correct_name] + distractors
+    else:
+        options = distractors
+    random.shuffle(options)
+
+    return {
+        "available": True,
+        "question": "请选择你创建的选手",
+        "options": options
+    }
+
+
+def _build_match_options(user):
+    """构造比赛验证选择题，只取1条正确数据，无数据时也返回纯干扰项"""
+    user_matches = Match.query.filter_by(created_by=user.id, deleted=0).all()
+
+    def _match_label(m):
+        date_str = datetime.fromtimestamp(m.match_time).strftime('%Y-%m-%d') if m.match_time else '未知日期'
+        return f"{date_str} {m.type}"
+
+    # 随机选1条正确答案
+    correct_label = _match_label(random.choice(user_matches)) if user_matches else None
+
+    # 从其他用户的比赛中选取干扰项
+    other_matches = Match.query.filter(
+        Match.created_by != user.id,
+        Match.deleted == 0
+    ).all()
+    other_labels = list(set(_match_label(m) for m in other_matches if _match_label(m) != correct_label))
+    random.shuffle(other_labels)
+
+    # 凑够4个选项
+    distractor_count = min(len(other_labels), 3)
+    distractors = other_labels[:distractor_count]
+    if correct_label:
+        options = [correct_label] + distractors
+    else:
+        options = distractors
+    random.shuffle(options)
+
+    return {
+        "available": True,
+        "question": "请选择你录入的比赛",
+        "options": options
+    }
+
+
+def _build_team_options(user):
+    """构造团队验证选择题，只取1条正确数据，无数据时也返回纯干扰项"""
+    user_team_members = TeamMember.query.filter_by(user_id=user.id).all()
+
+    team_ids = [tm.team_id for tm in user_team_members]
+    user_teams = Team.query.filter(Team.id.in_(team_ids), Team.deleted == 0).all() if team_ids else []
+
+    # 随机选1条正确答案
+    correct_name = random.choice([t.name for t in user_teams]) if user_teams else None
+
+    # 从其他团队中选取干扰项
+    other_teams = Team.query.filter(
+        Team.id.notin_(team_ids) if team_ids else True,
+        Team.deleted == 0
+    ).all()
+    other_names = list(set(t.name for t in other_teams if t.name != correct_name))
+    random.shuffle(other_names)
+
+    # 凑够4个选项
+    distractor_count = min(len(other_names), 3)
+    distractors = other_names[:distractor_count]
+    if correct_name:
+        options = [correct_name] + distractors
+    else:
+        options = distractors
+    random.shuffle(options)
+
+    return {
+        "available": True,
+        "question": "请选择你加入的团队",
+        "options": options
+    }
+
+
+@auth_bp.route('/forgot-password/verify-account', methods=['POST'])
+def forgot_password_verify_account():
+    """Step 1: 验证账号存在，返回可验证项和选择题"""
+    data = request.get_json(silent=True) or {}
+    account = data.get('account', '').strip()
+
+    if not account:
+        return bad_request("请输入账号")
+
+    if not _check_rate_limit(account):
+        return bad_request("尝试次数过多，请24小时后再试")
+
+    user = User.query.filter_by(account=account).first()
+    if not user:
+        # 不暴露账号是否存在
+        return bad_request("验证失败")
+
+    player_opts = _build_player_options(user)
+    match_opts = _build_match_options(user)
+    team_opts = _build_team_options(user)
+
+    result = {"verification_options": {}}
+    for key, opts in [("players", player_opts), ("matches", match_opts), ("teams", team_opts)]:
+        result["verification_options"][key] = {
+            "available": True,
+            "question": opts["question"],
+            "options": opts["options"]
+        }
+
+    return success(result)
+
+
+@auth_bp.route('/forgot-password/verify-identity', methods=['POST'])
+def forgot_password_verify_identity():
+    """Step 2: 提交验证答案，验证通过返回临时Token"""
+    data = request.get_json(silent=True) or {}
+    account = data.get('account', '').strip()
+    verification = data.get('verification', {})
+
+    if not account:
+        return bad_request("请输入账号")
+
+    if not _check_rate_limit(account):
+        return bad_request("尝试次数过多，请24小时后再试")
+
+    _record_attempt(account)
+
+    user = User.query.filter_by(account=account).first()
+    if not user:
+        return bad_request("验证失败")
+
+    v_type = verification.get('type', '')
+
+    if v_type == 'none':
+        # 用户声称未录入过数据，验证是否属实（排除注册时自动创建的选手）
+        has_players = SinglePlayer.query.filter(
+            SinglePlayer.created_by == user.id,
+            SinglePlayer.deleted == 0,
+            db.or_(SinglePlayer.user_id != user.id, SinglePlayer.user_id.is_(None))
+        ).first() is not None
+        has_matches = Match.query.filter_by(created_by=user.id, deleted=0).first() is not None
+        has_team_members = TeamMember.query.filter_by(user_id=user.id).first() is not None
+        if has_players or has_matches or has_team_members:
+            return bad_request("验证失败")
+    elif v_type == 'players':
+        selected = verification.get('selected', '')
+        if not selected:
+            return bad_request("验证失败")
+        # 排除注册时自动创建的选手
+        correct_players = SinglePlayer.query.filter(
+            SinglePlayer.created_by == user.id,
+            SinglePlayer.deleted == 0,
+            db.or_(SinglePlayer.user_id != user.id, SinglePlayer.user_id.is_(None))
+        ).all()
+        correct_names = set(p.name for p in correct_players)
+        if selected not in correct_names:
+            return bad_request("验证失败")
+    elif v_type == 'matches':
+        selected = verification.get('selected', '')
+        if not selected:
+            return bad_request("验证失败")
+        correct_matches = Match.query.filter_by(created_by=user.id, deleted=0).all()
+        def _match_label(m):
+            date_str = datetime.fromtimestamp(m.match_time).strftime('%Y-%m-%d') if m.match_time else '未知日期'
+            return f"{date_str} {m.type}"
+        correct_labels = set(_match_label(m) for m in correct_matches)
+        if selected not in correct_labels:
+            return bad_request("验证失败")
+    elif v_type == 'teams':
+        selected = verification.get('selected', '')
+        if not selected:
+            return bad_request("验证失败")
+        user_team_members = TeamMember.query.filter_by(user_id=user.id).all()
+        team_ids = [tm.team_id for tm in user_team_members]
+        correct_teams = Team.query.filter(Team.id.in_(team_ids), Team.deleted == 0).all() if team_ids else []
+        correct_names = set(t.name for t in correct_teams)
+        if selected not in correct_names:
+            return bad_request("验证失败")
+    else:
+        return bad_request("无效的验证类型")
+
+    # 验证通过，签发临时重置Token
+    reset_token = jwt.encode({
+        'type': 'reset_password',
+        'user_id': user.id,
+        'exp': int(time.time()) + 600
+    }, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
+
+    return success({"reset_token": reset_token})
+
+
+@auth_bp.route('/forgot-password/reset', methods=['POST'])
+def forgot_password_reset():
+    """Step 3: 用临时Token重置密码"""
+    data = request.get_json(silent=True) or {}
+    reset_token = data.get('reset_token', '')
+    new_password = data.get('new_password', '')
+
+    if not reset_token or not new_password:
+        return bad_request("参数不完整")
+
+    ok, msg = validate_password(new_password)
+    if not ok:
+        return bad_request(msg)
+
+    try:
+        token_data = jwt.decode(reset_token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        if token_data.get('type') != 'reset_password':
+            return bad_request("无效的重置Token")
+    except jwt.ExpiredSignatureError:
+        return bad_request("重置Token已过期，请重新验证")
+    except jwt.InvalidTokenError:
+        return bad_request("无效的重置Token")
+
+    user_id = token_data['user_id']
+    user = User.query.get(user_id)
+    if not user:
+        return bad_request("用户不存在")
+
+    user.set_password(new_password)
+    user.updated_at = int(time.time())
+    db.session.commit()
+
+    return success({"message": "密码重置成功"})
